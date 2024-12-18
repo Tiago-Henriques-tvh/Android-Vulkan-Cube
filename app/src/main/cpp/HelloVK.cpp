@@ -105,9 +105,9 @@ static void DestroyDebugUtilsMessengerEXT(
     }
 }
 
-
-// -------------- Hello VK functions implementation -----------------
-// Note: implemented by order of perception
+// -------------------------------------------------------------------------------------------------
+// -------------------------------- Hello VK functions implementation ------------------------------
+// -------------------------------------------------------------------------------------------------
 
 void vkt::HelloVK::initVulkan() {
     createInstance();
@@ -136,7 +136,9 @@ void vkt::HelloVK::initVulkan() {
     initialized = true;
 }
 
-// #1. setup process (vulkan instance and device)
+// -------------------------------------------------------------------------------------------------
+// #1. Setup process - vulkan instance and device
+// -------------------------------------------------------------------------------------------------
 
 /*
  * Created once at the start of the application and destroyed at the end. However, it is possible
@@ -341,7 +343,9 @@ void vkt::HelloVK::createLogicalDeviceAndQueue() {
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
-// #2. setup process (Create Swapchain and sync objects)
+// -------------------------------------------------------------------------------------------------
+// #2. Setup process - Create Swapchain and sync objects
+// -------------------------------------------------------------------------------------------------
 
 /*
  * Sync objects are objects used for synchronization. Vulkan has VkFence, VkSemaphore, and VkEvent
@@ -496,21 +500,28 @@ void vkt::HelloVK::recreateSwapChain() {
     createFramebuffers();
 }
 
-// #3. Create Renderpass and Framebuffer
+// -------------------------------------------------------------------------------------------------
+// #3. Setup process - Create Renderpass and Framebuffer
+// -------------------------------------------------------------------------------------------------
 
 /*
  * VkImageView: Describes how to access a VkImage, specifying the image's subresource range, pixel
- * format, and channel swizzle. VkRenderPass: Defines how the GPU should render a scene, including
- * attachments, rendering order, and usage at each pipeline stage. VkFramebuffer: Represents a set
- * of image views bound as attachments during a render pass's execution.
+ * format, and channel swizzle.
+ *
+ * VkRenderPass: Defines how the GPU should render a scene, including attachments, rendering order,
+ * and usage at each pipeline stage.
+ *
+ * VkFramebuffer: Represents a set of image views bound as attachments during a render pass's execution.
+ *
+ * The loop iterates over each image in swapChainImages to create a corresponding image view.
  */
 void vkt::HelloVK::createImageViews() {
     swapChainImageViews.resize(swapChainImages.size());
     for (size_t i = 0; i < swapChainImages.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = swapChainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.image = swapChainImages[i]; // Specifies the Vulkan image to be accessed.
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // Sets the image view type as 2D.
         createInfo.format = swapChainImageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -523,6 +534,76 @@ void vkt::HelloVK::createImageViews() {
         createInfo.subresourceRange.layerCount = 1;
         VK_CHECK(vkCreateImageView(device, &createInfo, nullptr,
                                    &swapChainImageViews[i]));
+    }
+}
+
+/*
+ * Attachment in Vulkan is what is usually known as render target, which is usually an image used as
+ * output for rendering.
+ */
+void vkt::HelloVK::createRenderPass() {
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = swapChainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    VK_CHECK(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
+}
+
+/*
+ * Framebuffer represents the link to actual images that can be used for attachments (render target).
+ * Create a Framebuffer object by specifying the renderpass and the set of imageviews.
+ */
+void vkt::HelloVK::createFramebuffers() {
+    swapChainFramebuffers.resize(swapChainImageViews.size());
+    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+        VkImageView attachments[] = {swapChainImageViews[i]};
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = swapChainExtent.width;
+        framebufferInfo.height = swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        VK_CHECK(vkCreateFramebuffer(device, &framebufferInfo, nullptr,
+                                     &swapChainFramebuffers[i]));
     }
 }
 
@@ -1175,49 +1256,6 @@ void vkt::HelloVK::createTextureSampler() {
     VK_CHECK(vkCreateSampler(device, &createInfo, nullptr, &textureSampler));
 }
 
-void vkt::HelloVK::createRenderPass() {
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapChainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    VK_CHECK(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
-}
-
 /*
  * Creates a graphics pipeline loading a simple vertex and fragment shader, both
  * with 'main' set as entrypoint A list of standard parameters are provided:
@@ -1385,24 +1423,7 @@ VkShaderModule vkt::HelloVK::createShaderModule(const std::vector<uint8_t> &code
     return shaderModule;
 }
 
-void vkt::HelloVK::createFramebuffers() {
-    swapChainFramebuffers.resize(swapChainImageViews.size());
-    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        VkImageView attachments[] = {swapChainImageViews[i]};
 
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = swapChainExtent.width;
-        framebufferInfo.height = swapChainExtent.height;
-        framebufferInfo.layers = 1;
-
-        VK_CHECK(vkCreateFramebuffer(device, &framebufferInfo, nullptr,
-                                     &swapChainFramebuffers[i]));
-    }
-}
 
 void vkt::HelloVK::createCommandPool() {
     QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
