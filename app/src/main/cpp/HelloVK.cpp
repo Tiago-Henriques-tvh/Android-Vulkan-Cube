@@ -117,30 +117,30 @@ struct UniformBufferObject {
 // -------------------------------------------------------------------------------------------------
 
 void vkt::HelloVK::initVulkan() {
-    createInstance();
-    createSurface();
-    pickPhysicalDevice();
-    createLogicalDeviceAndQueue();
-    setupDebugMessenger();
-    establishDisplaySizeIdentity();
-    createSwapChain();
-    createImageViews();
-    createRenderPass();
-    createDescriptorSetLayout();
-    createGraphicsPipeline();
-    createFramebuffers();
-    createCommandPool();
-    createCommandBuffer();
-    decodeImage();
-    createTextureImage();
-    copyBufferToImage();
-    createTextureImageViews();
-    createTextureSampler();
-    createUniformBuffers();
-    createDescriptorPool();
-    createDescriptorSets();
-    createSyncObjects();
-    initialized = true;
+    createInstance();                // Creates the Vulkan instance.
+    createSurface();                 // Creates a surface for the swap chain, typically platform-specific (e.g., GLFW, Win32, etc.).
+    pickPhysicalDevice();            // Selects the physical device (GPU) based on supported features and preferences.
+    createLogicalDeviceAndQueue();   // Creates a logical device (GPU abstraction) and command queues.
+    setupDebugMessenger();           // Sets up debugging tools (optional, but very useful for development).
+    establishDisplaySizeIdentity();  // Initializes display size and other related parameters.
+    createSwapChain();               // Creates the swap chain, which is a collection of images to display on the screen.
+    createImageViews();              // Creates image views for the swap chain images.
+    createRenderPass();              // Defines the render pass, which specifies how rendering is done.
+    createDescriptorSetLayout();     // Creates the descriptor set layout to describe how shaders access resources.
+    createGraphicsPipeline();        // Creates the graphics pipeline, which specifies shaders and their configuration.
+    createFramebuffers();            // Creates framebuffers for each swap chain image.
+    createCommandPool();             // Creates a command pool for managing command buffers.
+    createCommandBuffer();           // Creates the command buffer to record drawing commands.
+    decodeImage();                   // Decodes image data (possibly loading textures).
+    createTextureImage();            // Creates an image for storing the texture.
+    copyBufferToImage();             // Copies the texture data to the created image.
+    createTextureImageViews();       // Creates image views for the texture images.
+    createTextureSampler();          // Creates a texture sampler for sampling the texture in shaders.
+    createUniformBuffers();          // Creates uniform buffers for passing data to shaders (like MVP matrix).
+    createDescriptorPool();          // Creates a descriptor pool to allocate resources like uniform buffers and textures.
+    createDescriptorSets();          // Creates descriptor sets for shaders to access resources (like uniform buffers).
+    createSyncObjects();             // Creates synchronization objects (like semaphores and fences) for handling GPU synchronization.
+    initialized = true;              // Marks the Vulkan initialization as complete.
 }
 
 // -------------------------------------------------------------------------------------------------
