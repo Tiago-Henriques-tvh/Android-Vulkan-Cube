@@ -14,10 +14,6 @@
 #include <string>
 #include <vector>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 namespace vkt {
 #define LOG_TAG "hellovkjni"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -69,10 +65,6 @@ namespace vkt {
     };
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
-
-    struct UniformBufferObject {
-        glm::mat4 mvp;
-    };
 
     class HelloVK {
     public:
