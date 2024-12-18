@@ -32,10 +32,12 @@ namespace vkt {
   } while (0)
 
     /*
-T    * Cada GPU possui várias famílias de filas que processam diferentes tipos de comandos. Tipos de
-     * Queues: Gráficos (GRAPHICS): Processa comandos gráficos como desenho e renderização. Computação
-     * (COMPUTE): Processa cálculos paralelos, como computação científica. Transferência (TRANSFER):
-     * Lida com transferências de memória.
+     * Each GPU has several families of queues that process different types of commands.
+     *
+     * Queue Types:
+     * Graphics (GRAPHICS): Processes graphics commands such as drawing and rendering.
+     * Compute (COMPUTE): Processes parallel calculations, such as scientific computing.
+     * Transfer (TRANSFER): Handles memory transfers.
      */
     struct QueueFamilyIndices {
         std::optional <uint32_t> graphicsFamily;
@@ -47,11 +49,14 @@ T    * Cada GPU possui várias famílias de filas que processam diferentes tipos
     };
 
     /*
-     * VkSurfaceKHR, Representa uma superfície para renderização, associada à janela da aplicação.
-     * Necessário para apresentar gráficos no ecrã. A aplicação cria uma superfície a partir de uma
-     * janela existente. VkSwapchainKHR: infraestrutura que contém imagens que serão apresentadas no
-     * ecrã. 1. A aplicação adquire uma imagem da cadeia de troca. 2. Desenha na imagem. 3. Apresenta
-     * a imagem de volta ao ecrã.
+     * VkSurfaceKHR, Represents a surface for rendering, associated with the application window.
+     * Required to display graphics on the screen. The application creates a surface from an existing
+     * window.
+     *
+     * VkSwapchainKHR: infrastructure that contains images that will be displayed on the screen.
+     * 1. The application acquires an image of the exchange chain.
+     * 2. Draw on the image.
+     * 3. Display the image back on the screen.
      */
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;
@@ -72,56 +77,32 @@ T    * Cada GPU possui várias famílias de filas que processam diferentes tipos
     class HelloVK {
     public:
         void initVulkan();
-
         void render();
-
         void cleanup();
-
         void cleanupSwapChain();
-
         void reset(ANativeWindow *newWindow, AAssetManager *newManager);
-
         bool initialized = false;
 
     private:
         void createDevice();
-
         void createInstance();
-
         void createSurface();
-
         void setupDebugMessenger();
-
         void pickPhysicalDevice();
-
         void createLogicalDeviceAndQueue();
-
         void createSwapChain();
-
         void createImageViews();
-
         void createTextureImage();
-
         void decodeImage();
-
         void createTextureImageViews();
-
         void createTextureSampler();
-
         void copyBufferToImage();
-
         void createRenderPass();
-
         void createDescriptorSetLayout();
-
         void createGraphicsPipeline();
-
         void createFramebuffers();
-
         void createCommandPool();
-
         void createCommandBuffer();
-
         void createSyncObjects();
 
         // Helper methods

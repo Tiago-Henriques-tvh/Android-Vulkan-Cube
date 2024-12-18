@@ -499,9 +499,11 @@ void vkt::HelloVK::recreateSwapChain() {
 // #3. Create Renderpass and Framebuffer
 
 /*
- *
+ * VkImageView: Describes how to access a VkImage, specifying the image's subresource range, pixel
+ * format, and channel swizzle. VkRenderPass: Defines how the GPU should render a scene, including
+ * attachments, rendering order, and usage at each pipeline stage. VkFramebuffer: Represents a set
+ * of image views bound as attachments during a render pass's execution.
  */
-
 void vkt::HelloVK::createImageViews() {
     swapChainImageViews.resize(swapChainImages.size());
     for (size_t i = 0; i < swapChainImages.size(); i++) {
@@ -974,7 +976,6 @@ void vkt::HelloVK::establishDisplaySizeIdentity() {
 
     displaySizeIdentity = capabilities.currentExtent;
 }
-
 
 
 void vkt::HelloVK::createTextureImage() {
