@@ -2,27 +2,27 @@
 
 // Uniform buffer containing an MVP matrix.
 // Currently the vulkan backend only sets the rotation matix required to handle device rotation.
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 MVP;
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
 } ubo;
 
-vec2 positions[4] = vec2[](
-    vec2(-0.5, -0.5), // Bottom-left
-    vec2(0.5, -0.5),  // Bottom-right
-    vec2(0.5, 0.5),   // Top-right
-    vec2(-0.5, 0.5)   // Top-left
+vec2 positions[3] = vec2[](
+    vec2(0.0, 1),
+    vec2(-0.5, -1.0),
+    vec2(0.5, -1.0)
 );
 
-vec2 texCoords[4] = vec2[](
-    vec2(0.0, 0.0), // Bottom-left
-    vec2(1.0, 0.0), // Bottom-right
-    vec2(1.0, 1.0), // Top-right
-    vec2(0.0, 1.0)  // Top-left
+vec2 texCoords[3] = vec2[](
+    vec2(0.5, 1.0),
+    vec2(0.0, 0.0),
+    vec2(1.0, 0.0)
 );
 
 layout(location = 0) out vec2 vTexCoords;
 
 void main() {
-    gl_Position = ubo.MVP * vec4(positions[gl_VertexIndex], 0.0, 1.0);
+    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(positions[gl_VertexIndex], 0.0, 1.0);
     vTexCoords = texCoords[gl_VertexIndex];
 }

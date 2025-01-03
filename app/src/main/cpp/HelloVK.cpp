@@ -2,6 +2,11 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_LEFT_HANDED
+
 #include <stb_image.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -108,10 +113,6 @@ static void DestroyDebugUtilsMessengerEXT(
     }
 }
 
-struct UniformBufferObject {
-    glm::mat4 mvp;
-};
-
 // -------------------------------------------------------------------------------------------------
 // -------------------------------- Hello VK functions implementation ------------------------------
 // -------------------------------------------------------------------------------------------------
@@ -159,7 +160,7 @@ void vkt::HelloVK::createInstance() {
 
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Hello Triangle";
+    appInfo.pApplicationName = "Vulkan app";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -1065,20 +1066,29 @@ void vkt::HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer,
  * getPrerotationMatrix handles screen rotation with 3 hardcoded rotation
  * matrices (detailed below). We skip the 180 degrees rotation.
  */
-void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
-                          const VkSurfaceTransformFlagBitsKHR &pretransformFlag,
-                          glm::mat4 &mat, float ratio) {
+void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR& capabilities,
+                          const VkSurfaceTransformFlagBitsKHR& pretransformFlag,
+                          glm::mat4& mat, float ratio) {
+    mat = glm::mat4(1.0f); // Initialize to identity matrix
 
-    mat = glm::mat4(1.0f); // mat is initialized to the identity matrix
-    mat = glm::scale(mat, glm::vec3(1.0f, ratio, 1.0f)); // scale by screen ratio
+    // Apply scaling based on the aspect ratio
+    mat = glm::scale(mat, glm::vec3(1.0f, ratio, 1.0f));
 
-    // rotate 0.5 degree every function call.
-    static float currentAngleDegrees = 0.0f;
-    currentAngleDegrees += 0.5f;
-    if (currentAngleDegrees >= 360.0f) {
-        currentAngleDegrees = 0.0f;
+    // Apply rotation based on the pretransform flag
+    switch (pretransformFlag) {
+        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            mat = glm::rotate(mat, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            mat = glm::rotate(mat, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+            mat = glm::rotate(mat, glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            break;
+        default:
+            // No rotation needed
+            break;
     }
-    mat = glm::rotate(mat, glm::radians(currentAngleDegrees), glm::vec3(0.0f, 0.0f, 1.0f));
 }
 
 /*
@@ -1087,17 +1097,24 @@ void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
  */
 void vkt::HelloVK::updateUniformBuffer(uint32_t currentImage) {
     VkSurfaceCapabilitiesKHR capabilities{};
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface,
-                                              &capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
 
     UniformBufferObject ubo{};
-    float ratio = (float) swapChainExtent.width / (float) swapChainExtent.height;
-    getPrerotationMatrix(capabilities, pretransformFlag,
-                         ubo.mvp, ratio);
-    void *data;
-    vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0,
-                &data);
-    memcpy(data, glm::value_ptr(ubo.mvp), sizeof(glm::mat4));
+    float ratio = static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height);
+
+    // Get the pre-rotation matrix
+    getPrerotationMatrix(capabilities, pretransformFlag, ubo.model, ratio);
+
+    // Set the view and projection matrices
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+    float FOV = glm::radians(45.0f);
+    ubo.proj = glm::perspective(FOV, ratio, 0.1f, 10.0f);
+    ubo.proj[1][1] *= -1; // invert the Y-axis component
+
+    // Map the uniform buffer and update it
+    void* data;
+    vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
     vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 }
 

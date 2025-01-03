@@ -14,6 +14,10 @@
 #include <string>
 #include <vector>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 namespace vkt {
 #define LOG_TAG "hellovkjni"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -65,6 +69,56 @@ namespace vkt {
     };
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
+
+    struct UniformBufferObject {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
+
+    struct Vertex {
+        glm::vec3 pos;
+
+        static VkVertexInputBindingDescription getBindingDescription() {
+            VkVertexInputBindingDescription bindingDescription{};
+            bindingDescription.binding = 0;
+            bindingDescription.stride = sizeof(Vertex);
+            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            return bindingDescription;
+        }
+
+        static std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions() {
+            std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions{};
+
+            attributeDescriptions[0].binding = 0;
+            attributeDescriptions[0].location = 0;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+            return attributeDescriptions;
+        }
+    };
+
+    const std::vector<Vertex> vertices = {
+            {{-0.5f, -0.5f, -0.5f}}, // Vertex 0
+            {{ 0.5f, -0.5f, -0.5f}}, // Vertex 1
+            {{ 0.5f,  0.5f, -0.5f}}, // Vertex 2
+            {{-0.5f,  0.5f, -0.5f}}, // Vertex 3
+            {{-0.5f, -0.5f,  0.5f}}, // Vertex 4
+            {{ 0.5f, -0.5f,  0.5f}}, // Vertex 5
+            {{ 0.5f,  0.5f,  0.5f}}, // Vertex 6
+            {{-0.5f,  0.5f,  0.5f}}  // Vertex 7
+    };
+
+    const std::vector<uint16_t> indices = {
+            0, 1, 2, 2, 3, 0, // Back face
+            4, 5, 6, 6, 7, 4, // Front face
+            4, 5, 1, 1, 0, 4, // Bottom face
+            7, 6, 2, 2, 3, 7, // Top face
+            4, 0, 3, 3, 7, 4, // Left face
+            5, 1, 2, 2, 6, 5  // Right face
+    };
 
     class HelloVK {
     public:
@@ -187,15 +241,7 @@ namespace vkt {
         VkSurfaceTransformFlagBitsKHR pretransformFlag;
 
         // Other Vulkan-specific helpers
-        /*
-         * In order to enable validation layer toggle this to true and
-         * follow the README.md instructions concerning the validation
-         * layers. You will be required to add separate vulkan validation
-         * '*.so' files in order to enable this.
-         *
-         * The validation layers are not shipped with the APK as they are sizeable.
-         */
-        bool enableValidationLayers = false;
+        bool enableValidationLayers = true;
         const std::vector<const char *> validationLayers = {
                 "VK_LAYER_KHRONOS_validation"};
         const std::vector<const char *> deviceExtensions = {
