@@ -6,16 +6,18 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 MVP;
 } ubo;
 
-vec2 positions[3] = vec2[](
-    vec2(0.0, 0.577),
-    vec2(-0.5, -0.289),
-    vec2(0.5, -0.289)
+vec2 positions[4] = vec2[](
+    vec2(-0.5, -0.5), // Bottom-left
+    vec2(0.5, -0.5),  // Bottom-right
+    vec2(0.5, 0.5),   // Top-right
+    vec2(-0.5, 0.5)   // Top-left
 );
 
-vec2 texCoords[3] = vec2[](
-    vec2(0.5, 1.0),
-    vec2(0.0, 0.0),
-    vec2(1.0, 0.0)
+vec2 texCoords[4] = vec2[](
+    vec2(0.0, 0.0), // Bottom-left
+    vec2(1.0, 0.0), // Bottom-right
+    vec2(1.0, 1.0), // Top-right
+    vec2(0.0, 1.0)  // Top-left
 );
 
 layout(location = 0) out vec2 vTexCoords;
