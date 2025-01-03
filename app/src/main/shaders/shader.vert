@@ -9,9 +9,9 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 } ubo;
 
 vec2 positions[3] = vec2[](
-    vec2(0.0, 1),
-    vec2(-0.5, -1.0),
-    vec2(0.5, -1.0)
+    vec2(0.0, 0.5),
+    vec2(-0.5, -0.25),
+    vec2(0.5, -0.25)
 );
 
 vec2 texCoords[3] = vec2[](

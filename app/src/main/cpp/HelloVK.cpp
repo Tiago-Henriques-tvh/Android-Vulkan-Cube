@@ -1066,29 +1066,8 @@ void vkt::HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer,
  * getPrerotationMatrix handles screen rotation with 3 hardcoded rotation
  * matrices (detailed below). We skip the 180 degrees rotation.
  */
-void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR& capabilities,
-                          const VkSurfaceTransformFlagBitsKHR& pretransformFlag,
-                          glm::mat4& mat, float ratio) {
-    mat = glm::mat4(1.0f); // Initialize to identity matrix
-
-    // Apply scaling based on the aspect ratio
-    mat = glm::scale(mat, glm::vec3(1.0f, ratio, 1.0f));
-
-    // Apply rotation based on the pretransform flag
-    switch (pretransformFlag) {
-        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
-            mat = glm::rotate(mat, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            break;
-        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
-            mat = glm::rotate(mat, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            break;
-        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
-            mat = glm::rotate(mat, glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            break;
-        default:
-            // No rotation needed
-            break;
-    }
+void rotateUniform(glm::mat4& mat, float time) {
+    mat = glm::rotate(glm::mat4(1.0f), time * glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 }
 
 /*
@@ -1099,11 +1078,15 @@ void vkt::HelloVK::updateUniformBuffer(uint32_t currentImage) {
     VkSurfaceCapabilitiesKHR capabilities{};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
 
+    static auto startTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
     UniformBufferObject ubo{};
     float ratio = static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height);
 
-    // Get the pre-rotation matrix
-    getPrerotationMatrix(capabilities, pretransformFlag, ubo.model, ratio);
+    // Rotate matrix
+    rotateUniform( ubo.model, time);
 
     // Set the view and projection matrices
     ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
