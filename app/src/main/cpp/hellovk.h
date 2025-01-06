@@ -106,7 +106,7 @@ namespace vkt {
         }
     };
 
-    const std::vector<Vertex> vertices = {
+    const std::vector<Vertex> cubeVertices = {
             // Front face (light pink)
             {{-0.5f, -0.5f, 0.5f},  {0.9f, 0.7f,  0.8f}},
             {{0.5f,  -0.5f, 0.5f},  {0.9f, 0.7f,  0.8f}},
@@ -144,7 +144,7 @@ namespace vkt {
             {{-0.5f, -0.5f, 0.5f},  {1.0f, 0.85f, 0.75f}},
     };
 
-    const std::vector<uint16_t> indices = {
+    const std::vector<uint16_t> cubeIndices = {
             0, 1, 2, 2, 3, 0, // Front face
             4, 5, 6, 6, 7, 4, // Back face
             8, 9, 10, 10, 11, 8, // Left face
@@ -153,115 +153,77 @@ namespace vkt {
             20, 21, 22, 22, 23, 20 // Bottom face
     };
 
+    const std::vector<Vertex> planeVertices = {
+            {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}},
+            {{1.0f,  -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}},
+            {{1.0f,  -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f}},
+            {{-1.0f, -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f}},
+    };
+
+    const std::vector<uint16_t> planeIndices = {
+            0, 1, 2, 2, 3, 0
+    };
+
     class HelloVK {
     public:
         void initVulkan();
-
         void render();
-
         void cleanup();
-
         void cleanupSwapChain();
-
         void reset(ANativeWindow *newWindow, AAssetManager *newManager);
 
         bool initialized = false;
 
     private:
         void createDevice();
-
         void createInstance();
-
         void createSurface();
-
         void setupDebugMessenger();
-
         void pickPhysicalDevice();
-
         void createLogicalDeviceAndQueue();
-
         void createSwapChain();
-
         void createImageViews();
-
         void createTextureImage();
-
         void decodeImage();
-
         void createTextureImageViews();
-
         void createTextureSampler();
-
         void copyBufferToImage();
-
         void createRenderPass();
-
         void createDescriptorSetLayout();
-
         void createGraphicsPipeline();
-
         void createFramebuffers();
-
         void createCommandPool();
-
         void createCommandBuffers();
-
         void createSyncObjects();
-
-        // Helper methods
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-
         bool isDeviceSuitable(VkPhysicalDevice device);
-
         bool checkValidationLayerSupport();
-
         std::vector<const char *> getRequiredExtensions(bool enableValidation);
-
         SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
-
         VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
-
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-
         void recreateSwapChain();
-
         void onOrientationChange();
-
         VkCommandBuffer beginSingleTimeCommands();
-
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-
-        // Memory and resource management
-        uint32_t findMemoryType(uint32_t typeFilter,
-                                VkMemoryPropertyFlags properties);
-
+        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                           VkMemoryPropertyFlags properties, VkBuffer &buffer,
                           VkDeviceMemory &bufferMemory);
-
         void createUniformBuffers();
-
         void updateUniformBuffer(uint32_t currentImage);
-
         void createDescriptorPool();
-
         void createDescriptorSets();
-
         void establishDisplaySizeIdentity();
-
+        void createIndexBuffer();
         void createVertexBuffer();
 
-        // Variables
+        // Private Variables
         std::unique_ptr<ANativeWindow, ANativeWindowDeleter> window;
         AAssetManager *assetManager;
-
-        // Vulkan objects
         VkInstance instance;
         VkDebugUtilsMessengerEXT debugMessenger;
         VkSurfaceKHR surface;
@@ -282,8 +244,6 @@ namespace vkt {
         VkDescriptorSetLayout descriptorSetLayout;
         VkPipelineLayout pipelineLayout;
         VkPipeline graphicsPipeline;
-
-        // Synchronization objects
         std::vector<VkBuffer> uniformBuffers;
         std::vector<VkDeviceMemory> uniformBuffersMemory;
         std::vector<VkSemaphore> imageAvailableSemaphores;
@@ -293,34 +253,27 @@ namespace vkt {
         std::vector<VkDescriptorSet> descriptorSets;
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingMemory;
-
-        // Texture management
         int textureWidth, textureHeight, textureChannels;
         VkImage textureImage;
         VkDeviceMemory textureImageMemory;
         VkImageView textureImageView;
         VkSampler textureSampler;
-
-        // Vertices management
         VkBuffer vertexBuffer;
         VkDeviceMemory vertexBufferMemory;
         VkBuffer indexBuffer;
         VkDeviceMemory indexBufferMemory;
-
-        // Frame management
         uint32_t currentFrame = 0;
         bool orientationChanged = false;
         VkSurfaceTransformFlagBitsKHR pretransformFlag;
 
-        // Other Vulkan-specific helpers
+        // Vulkan-specific
         bool enableValidationLayers = true;
         const std::vector<const char *> validationLayers = {
                 "VK_LAYER_KHRONOS_validation"};
+
+
         const std::vector<const char *> deviceExtensions = {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-
-
-        void createIndexBuffer();
     };
 
 }  // namespace vkt

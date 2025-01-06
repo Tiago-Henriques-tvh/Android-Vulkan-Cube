@@ -12,13 +12,13 @@
 /// Implements functions required for fundamental 'princple component analysis' in 2D, 3D, and 4D:
 ///   1) Computing a covariance matrics from a list of _relative_ position vectors
 ///   2) Compute the eigenvalues and eigenvectors of the covariance matrics
-/// This is useful, e.g., to compute an object-aligned bounding box from vertices of an object.
+/// This is useful, e.g., to compute an object-aligned bounding box from cubeVertices of an object.
 /// https://en.wikipedia.org/wiki/Principal_component_analysis
 ///
 /// Example:
 /// ```
 /// std::vector<glm::dvec3> ptData;
-/// // ... fill ptData with some point data, e.g. vertices
+/// // ... fill ptData with some point data, e.g. cubeVertices
 /// 
 /// glm::dvec3 center = computeCenter(ptData);
 /// 

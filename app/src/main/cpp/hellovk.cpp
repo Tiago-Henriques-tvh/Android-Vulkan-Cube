@@ -116,7 +116,7 @@ static void DestroyDebugUtilsMessengerEXT(
 }
 
 // -------------------------------------------------------------------------------------------------
-// -------------------------------- Hello VK functions implementation ------------------------------
+// ----------------------------------------- Functions Order ---------------------------------------
 // -------------------------------------------------------------------------------------------------
 
 void HelloVK::initVulkan() {
@@ -141,8 +141,8 @@ void HelloVK::initVulkan() {
     // createTextureImageViews();       // Creates image views for the texture images.
     // createTextureSampler();          // Creates a texture sampler for sampling the texture in shaders.
 
-    createVertexBuffer();
-    createIndexBuffer();
+    createVertexBuffer();           // Vertex buffers creation
+    createIndexBuffer();            // Index buffers creation
     createUniformBuffers();          // Creates uniform buffers for passing data to shaders (like MVP matrix).
     createDescriptorPool();          // Creates a descriptor pool to allocate resources like uniform buffers and textures.
     createDescriptorSets();          // Creates descriptor sets for shaders to access resources (like uniform buffers).
@@ -157,9 +157,8 @@ void HelloVK::initVulkan() {
 // -------------------------------------------------------------------------------------------------
 
 /*
- * Created once at the start of the application and destroyed at the end. However, it is possible
- * to create multiple VkInstances within the same application, for example, if the application
- * needs to use multiple GPUs or create multiple windows.
+ * It is possible to create multiple VkInstances within the same application, for example, if the
+ * application needs to use multiple GPUs or create multiple windows.
  */
 void HelloVK::createInstance() {
     assert(!enableValidationLayers ||
@@ -206,14 +205,10 @@ void HelloVK::createInstance() {
 }
 
 /*
- * 'createSurface' can only be called after the android ecosystem has had the
- * chance to provide a native window. This happens after the APP_CMD_START event
- * has had a chance to be called.
+ * 'createSurface' can only be called after the android ecosystem has had the chance to provide a
+ * native window. This happens after the APP_CMD_START event has had a chance to be called.
  *
  * VkSurface which represents the window to render to.
- *
- * Notice the window.get() call which is only valid after window has been set to
- * a non null value
  */
 void HelloVK::createSurface() {
     assert(window != nullptr);  // window not initialized
@@ -223,8 +218,7 @@ void HelloVK::createSurface() {
             .flags = 0,
             .window = window.get()};
 
-    VK_CHECK(vkCreateAndroidSurfaceKHR(instance, &create_info,
-                                       nullptr /* pAllocator */, &surface));
+    VK_CHECK(vkCreateAndroidSurfaceKHR(instance, &create_info, nullptr, &surface));
 }
 
 /*
@@ -619,7 +613,7 @@ void HelloVK::createFramebuffers() {
 
 /*
  * A VkShaderModule is a Vulkan object representing a programmable shader. Shaders are used to
- * perform various operations on graphics data, such as transforming vertices, shading pixels, and
+ * perform various operations on graphics data, such as transforming cubeVertices, shading pixels, and
  * computing global effects.
  *
  * A VkPipeline is a Vulkan object that represents a programmable graphics pipeline. It is a set of
@@ -718,7 +712,7 @@ void HelloVK::createGraphicsPipeline() {
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{}; // pass te vertices to shader
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{}; // pass te cubeVertices to shader
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescriptions();
@@ -1049,14 +1043,14 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
                             &descriptorSets[currentFrame], 0, nullptr);
 
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(cubeIndices.size()), 1, 0, 0, 0);
     vkCmdEndRenderPass(commandBuffer);
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
 /*
  * You may also need to update the Uniform Buffer as we are using the same transformation matrix for
- * all the vertices we're rendering.
+ * all the cubeVertices we're rendering.
  */
 void HelloVK::updateUniformBuffer(uint32_t currentImage) {
     VkSurfaceCapabilitiesKHR capabilities{};
@@ -1567,11 +1561,11 @@ void HelloVK::establishDisplaySizeIdentity() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// passing vertices through buffers
+// passing cubeVertices through buffers
 // ---------------------------------------------------------------------------------------------
 
 void HelloVK::createVertexBuffer() {
-    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+    VkDeviceSize bufferSize = sizeof(cubeVertices[0]) * cubeVertices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1581,7 +1575,7 @@ void HelloVK::createVertexBuffer() {
 
     void *data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, vertices.data(), (size_t) bufferSize);
+    memcpy(data, cubeVertices.data(), (size_t) bufferSize);
     vkUnmapMemory(device, stagingBufferMemory);
 
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -1637,7 +1631,7 @@ VkCommandBuffer HelloVK::beginSingleTimeCommands() {
 }
 
 void HelloVK::createIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    VkDeviceSize bufferSize = sizeof(cubeIndices[0]) * cubeIndices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1647,7 +1641,7 @@ void HelloVK::createIndexBuffer() {
 
     void *data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, indices.data(), (size_t) bufferSize);
+    memcpy(data, cubeIndices.data(), (size_t) bufferSize);
     vkUnmapMemory(device, stagingBufferMemory);
 
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,

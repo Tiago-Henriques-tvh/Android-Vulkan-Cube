@@ -1188,7 +1188,7 @@ HTML_TIMESTAMP         = NO
 HTML_DYNAMIC_SECTIONS  = NO
 
 # With HTML_INDEX_NUM_ENTRIES one can control the preferred number of entries
-# shown in the various tree structured indices initially; the user can expand
+# shown in the various tree structured cubeIndices initially; the user can expand
 # and collapse entries dynamically later on. Doxygen will expand the tree to
 # such a level that at most the specified number of entries are visible (unless
 # a fully collapsed tree already exceeds this amount). So setting the number of

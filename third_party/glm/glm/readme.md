@@ -195,7 +195,7 @@ glm::mat4 camera(float Translate, glm::vec2 const& Rotate)
 - Added identity functions #765
 - Splitted headers into EXT extensions to improve compilation time #670
 - Added separated performance tests
-- Clarified refract valid range of the indices of refraction, between -1 and 1 inclusively #806
+- Clarified refract valid range of the cubeIndices of refraction, between -1 and 1 inclusively #806
 
 #### Fixes:
 - Fixed SIMD detection on *Clang* and *GCC*
