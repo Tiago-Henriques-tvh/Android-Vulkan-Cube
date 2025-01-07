@@ -175,7 +175,6 @@ namespace vkt {
         bool initialized = false;
 
     private:
-        void createDevice();
         void createInstance();
         void createSurface();
         void setupDebugMessenger();
@@ -195,12 +194,12 @@ namespace vkt {
         void createCommandPool();
         void createCommandBuffers();
         void createSyncObjects();
-        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const;
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
         bool isDeviceSuitable(VkPhysicalDevice device);
         bool checkValidationLayerSupport();
-        std::vector<const char *> getRequiredExtensions(bool enableValidation);
-        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+        static std::vector<const char *> getRequiredExtensions(bool enableValidation);
+        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) const;
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
         VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
