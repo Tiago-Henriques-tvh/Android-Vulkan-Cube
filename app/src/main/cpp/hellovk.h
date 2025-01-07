@@ -68,7 +68,7 @@ namespace vkt {
         void operator()(ANativeWindow *window) { ANativeWindow_release(window); }
     };
 
-    const int MAX_FRAMES_IN_FLIGHT = 2;
+    const int MAX_FRAMES_IN_FLIGHT = 1;
 
     struct UniformBufferObject {
         glm::mat4 model;
@@ -153,47 +153,6 @@ namespace vkt {
             20, 21, 22, 22, 23, 20 // Bottom face
     };
 
-    struct TextureVertex {
-        glm::vec3 pos;
-        glm::vec2 texCoord;
-
-        static VkVertexInputBindingDescription getBindingDescription() {
-            VkVertexInputBindingDescription bindingDescription{};
-            bindingDescription.binding = 1;
-            bindingDescription.stride = sizeof(TextureVertex);
-            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-            return bindingDescription;
-        }
-
-        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-            std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
-
-            attributeDescriptions[0].binding = 1;
-            attributeDescriptions[0].location = 0;
-            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-            attributeDescriptions[0].offset = offsetof(TextureVertex, pos);
-
-            attributeDescriptions[1].binding = 1;
-            attributeDescriptions[1].location = 1;
-            attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
-            attributeDescriptions[1].offset = offsetof(TextureVertex, texCoord);
-
-            return attributeDescriptions;
-        }
-    };
-
-    const std::vector<TextureVertex> planeVertices = {
-            {{-1.0f, -1.0f, 1.0f},  {0.0f, 0.0f}}, // Bottom-left
-            {{1.0f,  -1.0f, 1.0f},  {1.0f, 0.0f}}, // Bottom-right
-            {{1.0f,  -1.0f, -1.0f}, {1.0f, 1.0f}}, // Top-right
-            {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}}  // Top-left
-    };
-
-    const std::vector<uint16_t> planeIndices = {
-            0, 1, 2, 2, 3, 0
-    };
-
     class HelloVK {
     public:
         void initVulkan();
@@ -223,16 +182,6 @@ namespace vkt {
 
         void createImageViews();
 
-        void createTextureImage();
-
-        void decodeImage();
-
-        void createTextureImageViews();
-
-        void createTextureSampler();
-
-        void copyBufferToImage();
-
         void createRenderPass();
 
         void createDescriptorSetLayout();
@@ -258,8 +207,6 @@ namespace vkt {
         static std::vector<const char *> getRequiredExtensions(bool enableValidation);
 
         SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) const;
-
-        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
         VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
 
@@ -325,13 +272,7 @@ namespace vkt {
         std::vector<VkFence> inFlightFences;
         VkDescriptorPool descriptorPool;
         std::vector<VkDescriptorSet> descriptorSets;
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingMemory;
-        int textureWidth, textureHeight, textureChannels;
         VkImage textureImage;
-        VkDeviceMemory textureImageMemory;
-        VkImageView textureImageView;
-        VkSampler textureSampler;
         VkBuffer vertexBuffer;
         VkDeviceMemory vertexBufferMemory;
         VkBuffer indexBuffer;
