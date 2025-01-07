@@ -153,11 +153,41 @@ namespace vkt {
             20, 21, 22, 22, 23, 20 // Bottom face
     };
 
-    const std::vector<Vertex> planeVertices = {
-            {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}},
-            {{1.0f,  -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}},
-            {{1.0f,  -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f}},
-            {{-1.0f, -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f}},
+    struct TextureVertex {
+        glm::vec3 pos;
+        glm::vec2 texCoord;
+
+        static VkVertexInputBindingDescription getBindingDescription() {
+            VkVertexInputBindingDescription bindingDescription{};
+            bindingDescription.binding = 1;
+            bindingDescription.stride = sizeof(TextureVertex);
+            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            return bindingDescription;
+        }
+
+        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+            std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+
+            attributeDescriptions[0].binding = 1;
+            attributeDescriptions[0].location = 0;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributeDescriptions[0].offset = offsetof(TextureVertex, pos);
+
+            attributeDescriptions[1].binding = 1;
+            attributeDescriptions[1].location = 1;
+            attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[1].offset = offsetof(TextureVertex, texCoord);
+
+            return attributeDescriptions;
+        }
+    };
+
+    const std::vector<TextureVertex> planeVertices = {
+            {{-1.0f, -1.0f, 1.0f},  {0.0f, 0.0f}}, // Bottom-left
+            {{1.0f,  -1.0f, 1.0f},  {1.0f, 0.0f}}, // Bottom-right
+            {{1.0f,  -1.0f, -1.0f}, {1.0f, 1.0f}}, // Top-right
+            {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}}  // Top-left
     };
 
     const std::vector<uint16_t> planeIndices = {
@@ -167,57 +197,102 @@ namespace vkt {
     class HelloVK {
     public:
         void initVulkan();
+
         void render();
+
         void cleanup();
+
         void cleanupSwapChain();
+
         void reset(ANativeWindow *newWindow, AAssetManager *newManager);
 
         bool initialized = false;
 
     private:
         void createInstance();
+
         void createSurface();
+
         void setupDebugMessenger();
+
         void pickPhysicalDevice();
+
         void createLogicalDeviceAndQueue();
+
         void createSwapChain();
+
         void createImageViews();
+
         void createTextureImage();
+
         void decodeImage();
+
         void createTextureImageViews();
+
         void createTextureSampler();
+
         void copyBufferToImage();
+
         void createRenderPass();
+
         void createDescriptorSetLayout();
+
         void createGraphicsPipeline();
+
         void createFramebuffers();
+
         void createCommandPool();
+
         void createCommandBuffers();
+
         void createSyncObjects();
+
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const;
+
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+
         bool isDeviceSuitable(VkPhysicalDevice device);
+
         bool checkValidationLayerSupport();
+
         static std::vector<const char *> getRequiredExtensions(bool enableValidation);
+
         SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) const;
+
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
+
         VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
+
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+
         void recreateSwapChain();
+
         void onOrientationChange();
+
         VkCommandBuffer beginSingleTimeCommands();
+
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                           VkMemoryPropertyFlags properties, VkBuffer &buffer,
                           VkDeviceMemory &bufferMemory);
+
         void createUniformBuffers();
+
         void updateUniformBuffer(uint32_t currentImage);
+
         void createDescriptorPool();
+
         void createDescriptorSets();
+
         void establishDisplaySizeIdentity();
+
         void createIndexBuffer();
+
         void createVertexBuffer();
 
         // Private Variables

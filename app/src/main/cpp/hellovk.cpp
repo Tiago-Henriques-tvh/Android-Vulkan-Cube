@@ -135,7 +135,7 @@ void HelloVK::initVulkan() {
     createFramebuffers();            // Creates framebuffers for each swap chain image.
     createCommandPool();             // Creates a command pool for managing command buffers.
 
-    // decodeImage();                   // Decodes image data (possibly loading textures).
+    // decodeImage();                   // Decodes image data (loading textures).
     // createTextureImage();            // Creates an image for storing the texture.
     // copyBufferToImage();             // Copies the texture data to the created image.
     // createTextureImageViews();       // Creates image views for the texture images.
@@ -1290,22 +1290,22 @@ void HelloVK::onOrientationChange() {
 
 /*
  * To apply texture to the triangle, the image file first needs to be loaded in uncompressed format
- * in memory.
+ * in memory. Loading and decoding the image data to RAM which is then copied over to Vulkan's
+ * buffer (VkBuffer).
  */
 void HelloVK::decodeImage() {
-    std::vector<uint8_t> imageData = LoadBinaryFileToVector("img.png",
-                                                            assetManager);
-    if (imageData.size() == 0) {
+    std::vector<uint8_t> vulkanPNGImgData = LoadBinaryFileToVector("img.png", assetManager);
+    if (vulkanPNGImgData.empty()) {
         LOGE("Fail to load image.");
         return;
     }
 
     // Make sure we have an alpha channel, not all hardware can do linear filtering of RGB888.
     const int requiredChannels = 4;
-    unsigned char *decodedData = stbi_load_from_memory(imageData.data(),
-                                                       imageData.size(), &textureWidth,
-                                                       &textureHeight, &textureChannels,
-                                                       requiredChannels);
+    unsigned char *decodedData = stbi_load_from_memory(vulkanPNGImgData.data(),
+                                                       vulkanPNGImgData.size(),
+                                                       &textureWidth, &textureHeight,
+                                                       &textureChannels, requiredChannels);
     if (decodedData == nullptr) {
         LOGE("Fail to load image to memory, %s", stbi_failure_reason());
         return;
@@ -1338,8 +1338,7 @@ void HelloVK::decodeImage() {
     VK_CHECK(vkBindBufferMemory(device, stagingBuffer, stagingMemory, 0));
 
     uint8_t *data;
-    VK_CHECK(vkMapMemory(device, stagingMemory, 0, memRequirements.size, 0,
-                         (void **) &data));
+    VK_CHECK(vkMapMemory(device, stagingMemory, 0, memRequirements.size, 0, (void **) &data));
     memcpy(data, decodedData, imageSize);
     vkUnmapMemory(device, stagingMemory);
 
@@ -1420,8 +1419,8 @@ void HelloVK::copyBufferToImage() {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                         nullptr, 0, nullptr, 1,
                          &imageMemoryBarrier);
 
     VkBufferImageCopy bufferImageCopy{};
@@ -1434,16 +1433,16 @@ void HelloVK::copyBufferToImage() {
     bufferImageCopy.imageExtent.depth = 1;
     bufferImageCopy.bufferOffset = 0;
 
-    vkCmdCopyBufferToImage(cmd, stagingBuffer, textureImage,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
+    vkCmdCopyBufferToImage(cmd, stagingBuffer, textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1, &bufferImageCopy);
 
     imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1,
                          &imageMemoryBarrier);
 
     vkEndCommandBuffer(cmd);
