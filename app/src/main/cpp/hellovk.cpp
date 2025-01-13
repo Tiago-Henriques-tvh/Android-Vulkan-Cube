@@ -1061,10 +1061,11 @@ void HelloVK::createCommandBuffers() {
 }
 
 struct DrawObject {
-    uint32_t indexCount;   // Number of indices for the object
-    VkDeviceSize vertexOffset; // Offset of the vertices in the vertex buffer
-    uint32_t firstIndex;   // First index in the index buffer
-    VkDescriptorSet descriptorSet; // Descriptor set for the object
+    uint32_t indexCount;
+    uint32_t vertexOffset;
+    uint32_t indexOffset;
+    VkDescriptorSet descriptorSet;
+    uint32_t firstIndex;
 };
 
 /*
@@ -1112,19 +1113,39 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
 
     VkBuffer vertexBuffers[] = {vertexBuffer};
     VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
-                            &descriptorSets[currentFrame], 0, nullptr);
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(planeIndices.size()), 1, 0, 0, 0);
 
-    // Bind vertex and index buffers for the cube
-    offsets[0] = sizeof(Vertex) * planeVertices.size(); // Offset for cube's vertex data
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, sizeof(uint16_t) * planeIndices.size(), VK_INDEX_TYPE_UINT16);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
-                            &descriptorSets[currentFrame], 0, nullptr);
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(cubeIndices.size()), 1, 0, 0, 0);
+    // Array of DrawObjects for plane and cube
+    std::vector<DrawObject> drawObjects = {
+            {
+                    static_cast<uint32_t>(planeIndices.size()),
+                    0,
+                    0,
+                    descriptorSets[currentFrame],
+                    0
+            },
+            {
+                    static_cast<uint32_t>(cubeIndices.size()),
+                    static_cast<uint32_t>(sizeof(Vertex) * planeVertices.size()),
+                    static_cast<uint32_t>(sizeof(uint16_t) * planeIndices.size()),
+                    descriptorSets[currentFrame],
+                    0
+            }
+    };
+
+
+    // Iterate over the objects and draw them
+    for (const auto &object: drawObjects) {
+        offsets[0] = object.vertexOffset;
+
+        // Bind vertex and index buffers for the object
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, object.indexOffset, VK_INDEX_TYPE_UINT16);
+        // Bind descriptor sets
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0,
+                                1, &object.descriptorSet, 0, nullptr);
+        // Draw the object
+        vkCmdDrawIndexed(commandBuffer, object.indexCount, 1, object.firstIndex, 0, 0);
+    }
 
     vkCmdEndRenderPass(commandBuffer);
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
