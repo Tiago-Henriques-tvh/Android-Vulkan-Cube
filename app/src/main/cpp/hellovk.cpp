@@ -125,7 +125,6 @@ void HelloVK::initVulkan() {
     createLogicalDeviceAndQueue();   // Creates a logical device (GPU abstraction) and command queues.
     setupDebugMessenger();           // Sets up debugging tools (optional, but very useful for development).
     establishDisplaySizeIdentity();  // Initializes display size and other related parameters.
-
     createSwapChain();               // Creates the swap chain, which is a collection of images to display on the screen.
     createImageViews();              // Creates image views for the swap chain images.
     createRenderPass();              // Defines the render pass, which specifies how rendering is done.
@@ -133,13 +132,14 @@ void HelloVK::initVulkan() {
     createGraphicsPipeline();        // Creates the graphics pipeline, which specifies shaders and their configuration.
     createFramebuffers();            // Creates framebuffers for each swap chain image.
     createCommandPool();             // Creates a command pool for managing command buffers.
+    createCommandBuffers();          // Creates the command buffer to record drawing commands.
 
+
+    createUniformBuffers();          // Creates uniform buffers for passing data to shaders (like MVP matrix).
     createVertexBuffer();            // Vertex buffers creation
     createIndexBuffer();             // Index buffers creation
-    createUniformBuffers();          // Creates uniform buffers for passing data to shaders (like MVP matrix).
     createDescriptorPool();          // Creates a descriptor pool to allocate resources like uniform buffers and textures.
     createDescriptorSets();          // Creates descriptor sets for shaders to access resources (like uniform buffers).
-    createCommandBuffers();          // Creates the command buffer to record drawing commands.
     createSyncObjects();             // Creates synchronization objects (like semaphores and fences) for handling GPU synchronization.
 
     initialized = true;              // Marks the Vulkan initialization as complete.
@@ -154,8 +154,7 @@ void HelloVK::initVulkan() {
  * application needs to use multiple GPUs or create multiple windows.
  */
 void HelloVK::createInstance() {
-    assert(!enableValidationLayers ||
-           checkValidationLayerSupport());
+    assert(!enableValidationLayers || checkValidationLayerSupport());
     auto requiredExtensions = getRequiredExtensions(enableValidationLayers);
 
     VkApplicationInfo appInfo{};
@@ -728,7 +727,7 @@ void HelloVK::createGraphicsPipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
@@ -877,9 +876,8 @@ void HelloVK::createUniformBuffers() {
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i],
-                     uniformBuffersMemory[i]);
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     uniformBuffers[i], uniformBuffersMemory[i]);
     }
 }
 
@@ -888,9 +886,9 @@ void HelloVK::createUniformBuffers() {
  * HOST_COHERENT memory Upon creation, these buffers will list memory requirements which need to
  * be satisfied by the device in use in order to be created.
  */
-void
-HelloVK::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-                      VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
+void HelloVK::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                           VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                           VkDeviceMemory &bufferMemory) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
@@ -933,7 +931,9 @@ uint32_t HelloVK::findMemoryType(uint32_t typeFilter,
 }
 
 void HelloVK::createVertexBuffer() {
-    VkDeviceSize bufferSize = sizeof(cubeVertices[0]) * cubeVertices.size();
+    VkDeviceSize cubeBufferSize = sizeof(cubeVertices[0]) * cubeVertices.size();
+    VkDeviceSize planeBufferSize = sizeof(planeVertices[0]) * planeVertices.size();
+    VkDeviceSize bufferSize = cubeBufferSize + planeBufferSize;
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -943,7 +943,9 @@ void HelloVK::createVertexBuffer() {
 
     void *data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, cubeVertices.data(), (size_t) bufferSize);
+    memcpy(data, planeVertices.data(), (size_t) planeBufferSize);
+    memcpy(static_cast<char *>(data) + planeBufferSize, cubeVertices.data(),
+           (size_t) cubeBufferSize);
     vkUnmapMemory(device, stagingBufferMemory);
 
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -956,7 +958,9 @@ void HelloVK::createVertexBuffer() {
 }
 
 void HelloVK::createIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(cubeIndices[0]) * cubeIndices.size();
+    VkDeviceSize cubeBufferSize = sizeof(cubeIndices[0]) * cubeIndices.size();
+    VkDeviceSize planeBufferSize = sizeof(planeIndices[0]) * planeIndices.size();
+    VkDeviceSize bufferSize = cubeBufferSize + planeBufferSize;
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -966,7 +970,10 @@ void HelloVK::createIndexBuffer() {
 
     void *data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, cubeIndices.data(), (size_t) bufferSize);
+    memcpy(data, planeIndices.data(), (size_t) planeBufferSize);
+    memcpy(static_cast<char *>(data) + planeBufferSize, cubeIndices.data(),
+           (size_t) cubeBufferSize);
+
     vkUnmapMemory(device, stagingBufferMemory);
 
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -977,6 +984,7 @@ void HelloVK::createIndexBuffer() {
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
+
 
 void HelloVK::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
@@ -1054,6 +1062,13 @@ void HelloVK::createCommandBuffers() {
     VK_CHECK(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()));
 }
 
+struct DrawObject {
+    uint32_t indexCount;   // Number of indices for the object
+    VkDeviceSize vertexOffset; // Offset of the vertices in the vertex buffer
+    uint32_t firstIndex;   // First index in the index buffer
+    VkDescriptorSet descriptorSet; // Descriptor set for the object
+};
+
 /*
  * In Vulkan, commands like drawing and memory transfers are recorded in command buffers instead of
  * being executed directly. This allows for efficient batch processing and supports multi-threaded
@@ -1099,14 +1114,25 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
 
     VkBuffer vertexBuffers[] = {vertexBuffer};
     VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    std::vector<DrawObject> drawObjects = {
+            {static_cast<uint32_t>(planeIndices.size()),
+                    0,
+                    0,
+                    descriptorSetsPlane[currentFrame]},
+            {static_cast<uint32_t>(cubeIndices.size()),
+                    sizeof(Vertex) * planeVertices.size(),
+                    static_cast<uint32_t>(planeIndices.size()),
+                    descriptorSetsCube[currentFrame]},
+    };
 
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    for (const auto &object: drawObjects) {
+        offsets[0] = object.vertexOffset;
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0,
+                                1, &object.descriptorSet, 0, nullptr);
+        vkCmdDrawIndexed(commandBuffer, object.indexCount, 1, object.firstIndex, 0, 0);
+    }
 
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
-                            &descriptorSets[currentFrame], 0, nullptr);
-
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(cubeIndices.size()), 1, 0, 0, 0);
     vkCmdEndRenderPass(commandBuffer);
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
@@ -1154,7 +1180,6 @@ void HelloVK::updateUniformBuffer(uint32_t currentImage) {
     ubo.proj = glm::perspective(FOV, ratio, 0.1f, 20.0f);
     ubo.proj[1][1] *= -1; // invert the Y-axis component
 
-    // Map the uniform buffer and update it
     void *data;
     vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
     memcpy(data, &ubo, sizeof(ubo));
@@ -1251,7 +1276,7 @@ void HelloVK::onOrientationChange() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// validation layer support if you need to debug your application and others
+// Validation layer support to debug application and others
 // ---------------------------------------------------------------------------------------------
 
 bool HelloVK::checkValidationLayerSupport() {
@@ -1275,6 +1300,16 @@ bool HelloVK::checkValidationLayerSupport() {
         }
     }
     return true;
+}
+
+std::vector<const char *> HelloVK::getRequiredExtensions(bool enableValidationLayers) {
+    std::vector<const char *> extensions;
+    extensions.push_back("VK_KHR_surface");
+    extensions.push_back("VK_KHR_android_surface");
+    if (enableValidationLayers) {
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+    return extensions;
 }
 
 void HelloVK::cleanupSwapChain() {
@@ -1334,16 +1369,6 @@ void HelloVK::setupDebugMessenger() {
 
     VK_CHECK(CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr,
                                           &debugMessenger));
-}
-
-std::vector<const char *> HelloVK::getRequiredExtensions(bool enableValidationLayers) {
-    std::vector<const char *> extensions;
-    extensions.push_back("VK_KHR_surface");
-    extensions.push_back("VK_KHR_android_surface");
-    if (enableValidationLayers) {
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
-    return extensions;
 }
 
 void HelloVK::establishDisplaySizeIdentity() {

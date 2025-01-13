@@ -68,7 +68,7 @@ namespace vkt {
         void operator()(ANativeWindow *window) { ANativeWindow_release(window); }
     };
 
-    const int MAX_FRAMES_IN_FLIGHT = 1;
+    const int MAX_FRAMES_IN_FLIGHT = 2;
 
     struct UniformBufferObject {
         glm::mat4 model;
@@ -79,6 +79,8 @@ namespace vkt {
     struct Vertex {
         glm::vec3 pos;
         glm::vec3 color;
+        int textureId;
+        glm::vec2 textcoord;
 
         static VkVertexInputBindingDescription getBindingDescription() {
             VkVertexInputBindingDescription bindingDescription{};
@@ -145,12 +147,34 @@ namespace vkt {
     };
 
     const std::vector<uint16_t> cubeIndices = {
-            0, 1, 2, 2, 3, 0, // Front face
-            4, 5, 6, 6, 7, 4, // Back face
-            8, 9, 10, 10, 11, 8, // Left face
-            12, 13, 14, 14, 15, 12, // Right face
-            16, 17, 18, 18, 19, 16, // Top face
-            20, 21, 22, 22, 23, 20 // Bottom face
+            0, 3, 2, 2, 1, 0, // Front face
+            4, 7, 6, 6, 5, 4, // Back face
+            8, 11, 10, 10, 9, 8, // Left face
+            12, 15, 14, 14, 13, 12, // Right face
+            16, 19, 18, 18, 17, 16, // Top face
+            20, 23, 22, 22, 21, 20  // Bottom face
+    };
+
+
+    const std::vector<Vertex> planeVertices = {
+            {{-1.3f, -1.2f, -1.3f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-up
+            {{ 1.3f,  -1.2f,-1.3f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-up
+            {{ 1.3f,  -1.2f, 1.3f},  {0.2f, 0.2f, 0.2f}}, // Top-right-up
+            {{-1.3f, -1.2f,  1.3f},  {0.2f, 0.2f, 0.2f}}, // Top-left-up
+
+            {{-1.3f, -1.4f, -1.3f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-down
+            {{ 1.3f,  -1.4f,-1.3f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-down
+            {{ 1.3f,  -1.4f, 1.3f},  {0.2f, 0.2f, 0.2f}}, // Top-right-down
+            {{-1.3f, -1.4f,  1.3f},  {0.2f, 0.2f, 0.2f}}, // Top-left-down
+    };
+
+    const std::vector<uint16_t> planeIndices = {
+            0, 1, 2, 2, 3, 0,
+            4, 5, 6, 6, 7, 4,
+            0, 1, 5, 5, 4, 0,
+            1, 2, 6, 6, 5, 1,
+            2, 3, 7, 7, 6, 2,
+            3, 0, 4, 4, 7, 3,
     };
 
     class HelloVK {
@@ -265,18 +289,29 @@ namespace vkt {
         VkDescriptorSetLayout descriptorSetLayout;
         VkPipelineLayout pipelineLayout;
         VkPipeline graphicsPipeline;
-        std::vector<VkBuffer> uniformBuffers;
-        std::vector<VkDeviceMemory> uniformBuffersMemory;
         std::vector<VkSemaphore> imageAvailableSemaphores;
         std::vector<VkSemaphore> renderFinishedSemaphores;
         std::vector<VkFence> inFlightFences;
+
+        std::vector<VkBuffer> uniformBuffers;
+        //std::vector<VkBuffer> uniformBuffersCube;
+        //std::vector<VkBuffer> uniformBuffersPlane;
+
+        std::vector<VkDeviceMemory> uniformBuffersMemory;
+        // std::vector<VkDeviceMemory> uniformBuffersMemoryCube;
+        // std::vector<VkDeviceMemory> uniformBuffersMemoryPlane;
+
         VkDescriptorPool descriptorPool;
+        std::vector<VkDescriptorSet> descriptorSetsCube;
+        std::vector<VkDescriptorSet> descriptorSetsPlane;
         std::vector<VkDescriptorSet> descriptorSets;
         VkImage textureImage;
+
         VkBuffer vertexBuffer;
         VkDeviceMemory vertexBufferMemory;
         VkBuffer indexBuffer;
         VkDeviceMemory indexBufferMemory;
+
         uint32_t currentFrame = 0;
         bool orientationChanged = false;
         VkSurfaceTransformFlagBitsKHR pretransformFlag;
@@ -285,7 +320,6 @@ namespace vkt {
         bool enableValidationLayers = true;
         const std::vector<const char *> validationLayers = {
                 "VK_LAYER_KHRONOS_validation"};
-
 
         const std::vector<const char *> deviceExtensions = {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME};
