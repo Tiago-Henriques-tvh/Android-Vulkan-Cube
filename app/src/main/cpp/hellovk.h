@@ -79,8 +79,6 @@ namespace vkt {
     struct Vertex {
         glm::vec3 pos;
         glm::vec3 color;
-        int textureId;
-        glm::vec2 textcoord;
 
         static VkVertexInputBindingDescription getBindingDescription() {
             VkVertexInputBindingDescription bindingDescription{};
