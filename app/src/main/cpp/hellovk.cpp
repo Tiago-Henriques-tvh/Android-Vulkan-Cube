@@ -1118,11 +1118,12 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
             {static_cast<uint32_t>(planeIndices.size()),
                     0,
                     0,
-                    descriptorSetsPlane[currentFrame]},
+                    descriptorSets[currentFrame]},
+
             {static_cast<uint32_t>(cubeIndices.size()),
                     sizeof(Vertex) * planeVertices.size(),
                     static_cast<uint32_t>(planeIndices.size()),
-                    descriptorSetsCube[currentFrame]},
+                    descriptorSets[currentFrame + MAX_FRAMES_IN_FLIGHT]},
     };
 
     for (const auto &object: drawObjects) {
@@ -1132,7 +1133,6 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
                                 1, &object.descriptorSet, 0, nullptr);
         vkCmdDrawIndexed(commandBuffer, object.indexCount, 1, object.firstIndex, 0, 0);
     }
-
     vkCmdEndRenderPass(commandBuffer);
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }

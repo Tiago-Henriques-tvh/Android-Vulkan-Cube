@@ -302,8 +302,7 @@ namespace vkt {
         // std::vector<VkDeviceMemory> uniformBuffersMemoryPlane;
 
         VkDescriptorPool descriptorPool;
-        std::vector<VkDescriptorSet> descriptorSetsCube;
-        std::vector<VkDescriptorSet> descriptorSetsPlane;
+
         std::vector<VkDescriptorSet> descriptorSets;
         VkImage textureImage;
 
