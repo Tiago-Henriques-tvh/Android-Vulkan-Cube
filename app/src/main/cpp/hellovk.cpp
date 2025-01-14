@@ -11,10 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-using namespace vkt;
-
-std::vector<uint8_t>
-LoadBinaryFileToVector(const char *file_path, AAssetManager *assetManager) {
+std::vector<uint8_t> LoadBinaryFileToVector(const char *file_path, AAssetManager *assetManager) {
     std::vector<uint8_t> file_content;
     assert(assetManager);
     AAsset *file =
@@ -66,11 +63,10 @@ const char *toStringMessageType(VkDebugUtilsMessageTypeFlagsEXT s) {
 
 static VKAPI_ATTR VkBool32
 
-VKAPI_CALL
-debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-              VkDebugUtilsMessageTypeFlagsEXT messageType,
-              const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-              void * /* pUserData */) {
+VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                         VkDebugUtilsMessageTypeFlagsEXT messageType,
+                         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                         void * /* pUserData */) {
     auto ms = toStringMessageSeverity(messageSeverity);
     auto mt = toStringMessageType(messageType);
     printf("[%s: %s]\n%s\n", ms, mt, pCallbackData->pMessage);
@@ -93,8 +89,7 @@ static void populateDebugMessengerCreateInfo(
 
 static VkResult CreateDebugUtilsMessengerEXT(
         VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
-        const VkAllocationCallbacks *pAllocator,
-        VkDebugUtilsMessengerEXT *pDebugMessenger) {
+        const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger) {
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(
             instance, "vkCreateDebugUtilsMessengerEXT");
     if (func != nullptr) {
@@ -104,9 +99,9 @@ static VkResult CreateDebugUtilsMessengerEXT(
     }
 }
 
-static void DestroyDebugUtilsMessengerEXT(
-        VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
-        const VkAllocationCallbacks *pAllocator) {
+static void
+DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
+                              const VkAllocationCallbacks *pAllocator) {
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(
             instance, "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr) {
@@ -118,6 +113,8 @@ static void DestroyDebugUtilsMessengerEXT(
 // ----------------------------------------- Functions Order ---------------------------------------
 // -------------------------------------------------------------------------------------------------
 
+using namespace vkt;
+
 void HelloVK::initVulkan() {
     createInstance();                // Creates the Vulkan instance.
     createSurface();                 // Creates a surface for the swapchain, typically platform-specific (e.g., GLFW, Win32, etc.).
@@ -128,7 +125,7 @@ void HelloVK::initVulkan() {
 
     createSwapChain();               // Creates the swap chain, which is a collection of images to display on the screen.
     createImageViews();              // Creates image views for the swap chain images.
-    createRenderPass();              // Defines the render pass, which specifies how rendering is done.
+    createRenderPass();              // Sspecifies how rendering is done.
     createDescriptorSetLayout();     // Creates the descriptor set layout to describe how shaders access resources.
     createGraphicsPipeline();        // Creates the graphics pipeline, which specifies shaders and their configuration.
     createFramebuffers();            // Creates framebuffers for each swap chain image.
@@ -813,7 +810,7 @@ void HelloVK::createGraphicsPipeline() {
 void HelloVK::createDescriptorPool() {
     VkDescriptorPoolSize poolSizes[1];
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)  * 2;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -831,33 +828,62 @@ void HelloVK::createDescriptorPool() {
  * buffers).
  */
 void HelloVK::createDescriptorSets() {
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+    // Create layouts for both cube and plane (MAX_FRAMES_IN_FLIGHT sets for each)
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT * 2, descriptorSetLayout);
+
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
     allocInfo.pSetLayouts = layouts.data();
 
-    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    VK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()));
+    // Resize to hold all descriptor sets for cube and plane
+    cubeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    planeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 
+    std::vector<VkDescriptorSet> allDescriptorSets(MAX_FRAMES_IN_FLIGHT * 2);
+    VK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, allDescriptorSets.data()));
+
+    // Split descriptor sets between cube and plane
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
+        cubeDescriptorSets[i] = allDescriptorSets[i * 2];
+        planeDescriptorSets[i] = allDescriptorSets[i * 2 + 1];
 
-        std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+        // Descriptor buffer info for the cube
+        VkDescriptorBufferInfo cubeBufferInfo{};
+        cubeBufferInfo.buffer = cubeUniformBuffers[i];
+        cubeBufferInfo.offset = 0;
+        cubeBufferInfo.range = sizeof(UniformBufferObject);
 
-        // Uniform buffer
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = descriptorSets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
+        // Descriptor buffer info for the plane
+        VkDescriptorBufferInfo planeBufferInfo{};
+        planeBufferInfo.buffer = planeUniformBuffers[i];
+        planeBufferInfo.offset = 0;
+        planeBufferInfo.range = sizeof(UniformBufferObject);
 
+        // Write descriptor sets for the cube
+        VkWriteDescriptorSet cubeDescriptorWrite{};
+        cubeDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        cubeDescriptorWrite.dstSet = cubeDescriptorSets[i];
+        cubeDescriptorWrite.dstBinding = 0;
+        cubeDescriptorWrite.dstArrayElement = 0;
+        cubeDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        cubeDescriptorWrite.descriptorCount = 1;
+        cubeDescriptorWrite.pBufferInfo = &cubeBufferInfo;
+
+        // Write descriptor sets for the plane
+        VkWriteDescriptorSet planeDescriptorWrite{};
+        planeDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        planeDescriptorWrite.dstSet = planeDescriptorSets[i];
+        planeDescriptorWrite.dstBinding = 0;
+        planeDescriptorWrite.dstArrayElement = 0;
+        planeDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        planeDescriptorWrite.descriptorCount = 1;
+        planeDescriptorWrite.pBufferInfo = &planeBufferInfo;
+
+        // Update descriptor sets
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites = {cubeDescriptorWrite,
+                                                                planeDescriptorWrite};
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()),
                                descriptorWrites.data(), 0, nullptr);
     }
@@ -871,13 +897,22 @@ void HelloVK::createDescriptorSets() {
 void HelloVK::createUniformBuffers() {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-    uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    cubeUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    cubeUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    planeUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    planeUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT * 2; i++) {
+        // Cube uniform buffer
         createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     uniformBuffers[i], uniformBuffersMemory[i]);
+                     cubeUniformBuffers[i], cubeUniformBuffersMemory[i]);
+
+        // Plane uniform buffer
+        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     planeUniformBuffers[i], planeUniformBuffersMemory[i]);
     }
 }
 
@@ -1060,14 +1095,6 @@ void HelloVK::createCommandBuffers() {
     VK_CHECK(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()));
 }
 
-struct DrawObject {
-    uint32_t indexCount;
-    uint32_t vertexOffset;
-    uint32_t indexOffset;
-    VkDescriptorSet descriptorSet;
-    uint32_t firstIndex;
-};
-
 /*
  * In Vulkan, commands like drawing and memory transfers are recorded in command buffers instead of
  * being executed directly. This allows for efficient batch processing and supports multi-threaded
@@ -1088,9 +1115,8 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
     renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapChainExtent;
-
-    VkClearValue clearColor = {{{0.2588f, 0.2863f, 0.2863f, 1.0f}}};
     renderPassInfo.clearValueCount = 1;
+    VkClearValue clearColor = {{{0.2588f, 0.2863f, 0.2863f, 1.0f}}};
     renderPassInfo.pClearValues = &clearColor;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1113,25 +1139,23 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
 
     VkBuffer vertexBuffers[] = {vertexBuffer};
     VkDeviceSize offsets[] = {0};
-
     // Array of DrawObjects for plane and cube
     std::vector<DrawObject> drawObjects = {
             {
                     static_cast<uint32_t>(planeIndices.size()),
                     0,
                     0,
-                    descriptorSets[currentFrame],
+                    planeDescriptorSets[currentFrame],
                     0
             },
             {
                     static_cast<uint32_t>(cubeIndices.size()),
                     static_cast<uint32_t>(sizeof(Vertex) * planeVertices.size()),
                     static_cast<uint32_t>(sizeof(uint16_t) * planeIndices.size()),
-                    descriptorSets[currentFrame],
+                    cubeDescriptorSets[currentFrame],
                     0
             }
     };
-
 
     // Iterate over the objects and draw them
     for (const auto &object: drawObjects) {
@@ -1156,20 +1180,23 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
  * all the cubeVertices we're rendering.
  */
 void HelloVK::updateUniformBuffer(uint32_t currentImage) {
-    VkSurfaceCapabilitiesKHR capabilities{};
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+    // Common parameters
+    float ratio = static_cast<float>(swapChainExtent.width) /
+                  static_cast<float>(swapChainExtent.height);
+    glm::mat4 view = glm::lookAt(glm::vec3(-3.0f, 3.0f, 5.0f),
+                                 glm::vec3(0.0f, 0.0f, 0.0f),
+                                 glm::vec3(0.0f, 1.0f, 0.0f));
+    float FOV = glm::radians(60.0f);
+    glm::mat4 proj = glm::perspective(FOV, ratio, 0.1f, 20.0f);
+    proj[1][1] *= -1;// invert the Y-axis component
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.1f, 0.3f, 0.0f));
 
+    // Prepare cube transformation
+    UniformBufferObject cubeUbo{};
     static auto startTime = std::chrono::high_resolution_clock::now();
     auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>
-            (currentTime - startTime).count();
-
-    UniformBufferObject ubo{};
-    float ratio =
-            static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height);
-
-    // Rotate matrix
-    // ubo.model = glm::mat4(1.0f);
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(
+            currentTime - startTime).count();
     float amplitude = glm::radians(90.0f); // 90 degrees
     float frequency = 0.5f; // 0.5 Hz (full cycle every 2 seconds)
     float phaseShift = 0.0f; // Start from the left
@@ -1178,27 +1205,31 @@ void HelloVK::updateUniformBuffer(uint32_t currentImage) {
     if (phaseTime < 2.0f) {
         float angle =
                 amplitude * glm::sin(2.0f * glm::pi<float>() * frequency * phaseTime + phaseShift);
-        ubo.model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 1.0f, 0.0f));
+        cubeUbo.model = model * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 1.0f, 0.0f));
     } else {
         float angle = amplitude * glm::sin(
                 2.0f * glm::pi<float>() * frequency * (phaseTime - 2.0f) + phaseShift);
-        ubo.model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 0.0f));
+        cubeUbo.model = model * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 0.0f));
     }
+    cubeUbo.view = view;
+    cubeUbo.proj = proj;
 
-    // Set the view and projection matrices
-    ubo.view = glm::lookAt(glm::vec3(-2.0f, 2.0f, 5.0f),
-                           glm::vec3(0.0f, 0.0f, 0.0f),
-                           glm::vec3(0.0f, 1.0f, 0.0f));
+    // Prepare plane transformation
+    UniformBufferObject planeUbo{};
+    planeUbo.model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+    planeUbo.view = view;
+    planeUbo.proj = proj;
 
-    float FOV = glm::radians(60.0f);
-    ubo.proj = glm::perspective(FOV, ratio, 0.1f, 20.0f);
-    ubo.proj[1][1] *= -1; // invert the Y-axis component
-
-    // Map the uniform buffer and update it
+    // Update cube uniform buffer
     void *data;
-    vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
-    memcpy(data, &ubo, sizeof(ubo));
-    vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
+    vkMapMemory(device, cubeUniformBuffersMemory[currentImage], 0, sizeof(cubeUbo), 0, &data);
+    memcpy(data, &cubeUbo, sizeof(cubeUbo));
+    vkUnmapMemory(device, cubeUniformBuffersMemory[currentImage]);
+
+    // Update plane uniform buffer
+    vkMapMemory(device, planeUniformBuffersMemory[currentImage], 0, sizeof(planeUbo), 0, &data);
+    memcpy(data, &planeUbo, sizeof(planeUbo));
+    vkUnmapMemory(device, planeUniformBuffersMemory[currentImage]);
 }
 
 /*
@@ -1226,8 +1257,8 @@ void HelloVK::render() { // or draw frame
         recreateSwapChain();
         return;
     }
-    assert(result == VK_SUCCESS ||
-           result == VK_SUBOPTIMAL_KHR);  // failed to acquire swap chain image
+    // failed to acquire swap chain image
+    assert(result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR);
 
     // Update the uniform buffer for the current frame
     updateUniformBuffer(currentFrame);
@@ -1342,8 +1373,10 @@ void HelloVK::cleanup() {
     vkDestroyImage(device, textureImage, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        vkDestroyBuffer(device, cubeUniformBuffers[i], nullptr);
+        vkFreeMemory(device, cubeUniformBuffersMemory[i], nullptr);
+        vkDestroyBuffer(device, planeUniformBuffers[i], nullptr);
+        vkFreeMemory(device, planeUniformBuffersMemory[i], nullptr);
     }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
