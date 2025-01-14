@@ -76,10 +76,21 @@ namespace vkt {
         uint32_t firstIndex;
     };
 
+    struct Light {
+        glm::vec3 position;   // For point light (not needed for directional)
+        glm::vec3 direction;  // For directional light (only needed for directional)
+        glm::vec3 color;      // Light color (typically RGB)
+        float intensity;       // Light intensity
+        float constant;        // Point light attenuation (constant)
+        float linear;          // Point light attenuation (linear)
+        float quadratic;       // Point light attenuation (quadratic)
+    };
+
     struct UniformBufferObject {
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
+        Light light;
     };
 
     struct Vertex {
@@ -267,10 +278,10 @@ namespace vkt {
 
         void createVertexBuffer();
 
-        void updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+        void updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
                                      uint32_t currentImage);
 
-        void updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+        void updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
                                       uint32_t currentImage);
 
         // Native window and asset manager
@@ -319,11 +330,14 @@ namespace vkt {
         std::vector<VkDeviceMemory> cubeUniformBuffersMemory;       // Memory for cube uniform buffers
         std::vector<VkBuffer> planeUniformBuffers;                  // Uniform buffers for the plane
         std::vector<VkDeviceMemory> planeUniformBuffersMemory;      // Memory for plane uniform buffers
+        std::vector<VkBuffer> lightUniformBuffers;                  // Uniform buffers for the light
+        std::vector<VkDeviceMemory> lightUniformBuffersMemory;      // Memory for light uniform buffers
 
         // Descriptor pool and sets
         VkDescriptorPool descriptorPool;                            // Descriptor pool for allocation
         std::vector<VkDescriptorSet> cubeDescriptorSets;            // Descriptor sets for cube
         std::vector<VkDescriptorSet> planeDescriptorSets;           // Descriptor sets for plane
+        std::vector<VkDescriptorSet> lightDescriptorSets;           // Descriptor sets for lights
 
         // Textures
         VkImage textureImage;                                       // Texture image for rendering
@@ -345,7 +359,5 @@ namespace vkt {
                 "VK_LAYER_KHRONOS_validation"};
         const std::vector<const char *> deviceExtensions = {        // Device extension names
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-
-
     };
 }  // namespace vkt

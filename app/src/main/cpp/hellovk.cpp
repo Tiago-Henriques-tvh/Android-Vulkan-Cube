@@ -833,13 +833,13 @@ void HelloVK::createGraphicsPipeline() {
 void HelloVK::createDescriptorPool() {
     VkDescriptorPoolSize poolSizes[1];
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 3;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 3;
 
     VK_CHECK(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
 }
@@ -852,7 +852,7 @@ void HelloVK::createDescriptorPool() {
  */
 void HelloVK::createDescriptorSets() {
     // Create layouts for both cube and plane (MAX_FRAMES_IN_FLIGHT sets for each)
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT * 2, descriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT * 3, descriptorSetLayout);
 
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -863,14 +863,16 @@ void HelloVK::createDescriptorSets() {
     // Resize to hold all descriptor sets for cube and plane
     cubeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     planeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    lightDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 
-    std::vector<VkDescriptorSet> allDescriptorSets(MAX_FRAMES_IN_FLIGHT * 2);
+    std::vector<VkDescriptorSet> allDescriptorSets(MAX_FRAMES_IN_FLIGHT * 3);
     VK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, allDescriptorSets.data()));
 
     // Split descriptor sets between cube and plane
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        cubeDescriptorSets[i] = allDescriptorSets[i * 2];
-        planeDescriptorSets[i] = allDescriptorSets[i * 2 + 1];
+        cubeDescriptorSets[i] = allDescriptorSets[i * 3];
+        planeDescriptorSets[i] = allDescriptorSets[i * 3 + 1];
+        lightDescriptorSets[i] = allDescriptorSets[i * 3 + 2];  // New for light
 
         // Descriptor buffer info for the cube
         VkDescriptorBufferInfo cubeBufferInfo{};
@@ -883,6 +885,12 @@ void HelloVK::createDescriptorSets() {
         planeBufferInfo.buffer = planeUniformBuffers[i];
         planeBufferInfo.offset = 0;
         planeBufferInfo.range = sizeof(UniformBufferObject);
+
+        // Descriptor buffer info for the light (new)
+        VkDescriptorBufferInfo lightBufferInfo{};
+        lightBufferInfo.buffer = lightUniformBuffers[i];
+        lightBufferInfo.offset = 0;
+        lightBufferInfo.range = sizeof(Light);  // Assuming Light is the struct for your light data
 
         // Write descriptor sets for the cube
         VkWriteDescriptorSet cubeDescriptorWrite{};
@@ -904,9 +912,20 @@ void HelloVK::createDescriptorSets() {
         planeDescriptorWrite.descriptorCount = 1;
         planeDescriptorWrite.pBufferInfo = &planeBufferInfo;
 
+        // Write descriptor sets for the light
+        VkWriteDescriptorSet lightDescriptorWrite{};
+        lightDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        lightDescriptorWrite.dstSet = lightDescriptorSets[i];
+        lightDescriptorWrite.dstBinding = 0;
+        lightDescriptorWrite.dstArrayElement = 0;
+        lightDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        lightDescriptorWrite.descriptorCount = 1;
+        lightDescriptorWrite.pBufferInfo = &lightBufferInfo;
+
         // Update descriptor sets
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites = {cubeDescriptorWrite,
-                                                                planeDescriptorWrite};
+        std::array<VkWriteDescriptorSet, 3> descriptorWrites = {cubeDescriptorWrite,
+                                                                planeDescriptorWrite,
+                                                                lightDescriptorWrite};
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()),
                                descriptorWrites.data(), 0, nullptr);
     }
@@ -926,7 +945,10 @@ void HelloVK::createUniformBuffers() {
     planeUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     planeUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT * 2; i++) {
+    lightUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    lightUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT * 3; i++) {
         // Cube uniform buffer
         createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -936,6 +958,11 @@ void HelloVK::createUniformBuffers() {
         createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      planeUniformBuffers[i], planeUniformBuffersMemory[i]);
+
+        // Light uniform buffer
+        createBuffer(sizeof(Light), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     lightUniformBuffers[i], lightUniformBuffersMemory[i]);
     }
 }
 
@@ -1198,7 +1225,7 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
                                       uint32_t currentImage) {
     // Prepare cube transformation
     UniformBufferObject cubeUbo{};
@@ -1222,6 +1249,7 @@ void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4
     }
     cubeUbo.view = view;
     cubeUbo.proj = proj;
+    cubeUbo.light = light;
 
     // Update cube uniform buffer
     void *data;
@@ -1230,7 +1258,7 @@ void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4
     vkUnmapMemory(device, cubeUniformBuffersMemory[currentImage]);
 }
 
-void HelloVK::updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+void HelloVK::updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
                                        uint32_t currentImage) {
     // Prepare plane transformation
     UniformBufferObject planeUbo{};
@@ -1238,6 +1266,7 @@ void HelloVK::updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat
     planeUbo.model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
     planeUbo.view = view;
     planeUbo.proj = proj;
+    planeUbo.light = light;
 
     // Update plane uniform buffer
     void *data;
@@ -1261,8 +1290,24 @@ void HelloVK::updateUniformBuffer(uint32_t currentImage) {
     glm::mat4 proj = glm::perspective(FOV, ratio, 0.2f, 20.0f);
     proj[1][1] *= -1;// invert the Y-axis component
 
-    updatePlaneUniformBuffer(model, view, proj, currentImage);
-    updateCubeUniformBuffer(model, view, proj, currentImage);
+    // Define light properties (directional light in this example)
+    Light light{};
+    light.position = glm::vec3(0.0f, 5.0f, 0.0f);   // Position (only used for point/spot light)
+    light.direction = glm::vec3(0.0f, 0.0f, 0.0f); // Direction for directional light
+    light.color = glm::vec3(1.0f, 1.0f, 1.0f);      // White light
+    light.intensity = 1.0f;                                  // Full intensity
+    light.constant = 1.0f;                                   // Attenuation constants (for point light)
+    light.linear = 0.09f;
+    light.quadratic = 0.032f;
+
+    // Update light uniform buffer
+    void *data;
+    vkMapMemory(device, lightUniformBuffersMemory[currentImage], 0, sizeof(Light), 0, &data);
+    memcpy(data, &light, sizeof(Light));
+    vkUnmapMemory(device, lightUniformBuffersMemory[currentImage]);
+
+    updatePlaneUniformBuffer(model, view, proj, light, currentImage);
+    updateCubeUniformBuffer(model, view, proj, light, currentImage);
 }
 
 /*
@@ -1406,6 +1451,8 @@ void HelloVK::cleanup() {
         vkFreeMemory(device, cubeUniformBuffersMemory[i], nullptr);
         vkDestroyBuffer(device, planeUniformBuffers[i], nullptr);
         vkFreeMemory(device, planeUniformBuffersMemory[i], nullptr);
+        vkDestroyBuffer(device, lightUniformBuffers[i], nullptr);
+        vkFreeMemory(device, lightUniformBuffersMemory[i], nullptr);
     }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
