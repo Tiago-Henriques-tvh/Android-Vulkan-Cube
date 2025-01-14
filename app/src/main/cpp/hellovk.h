@@ -68,7 +68,15 @@ namespace vkt {
         void operator()(ANativeWindow *window) { ANativeWindow_release(window); }
     };
 
-    const int MAX_FRAMES_IN_FLIGHT = 1;
+    const int MAX_FRAMES_IN_FLIGHT = 2; // 2 for double buffering
+
+    struct DrawObject {
+        uint32_t indexCount;
+        uint32_t vertexOffset;
+        uint32_t indexOffset;
+        VkDescriptorSet descriptorSet;
+        uint32_t firstIndex;
+    };
 
     struct UniformBufferObject {
         glm::mat4 model;
@@ -79,6 +87,8 @@ namespace vkt {
     struct Vertex {
         glm::vec3 pos;
         glm::vec3 color;
+        glm::vec2 textCoord;
+        int textureId;
 
         static VkVertexInputBindingDescription getBindingDescription() {
             VkVertexInputBindingDescription bindingDescription{};
@@ -145,12 +155,33 @@ namespace vkt {
     };
 
     const std::vector<uint16_t> cubeIndices = {
-            0, 1, 2, 2, 3, 0, // Front face
-            4, 5, 6, 6, 7, 4, // Back face
-            8, 9, 10, 10, 11, 8, // Left face
-            12, 13, 14, 14, 15, 12, // Right face
-            16, 17, 18, 18, 19, 16, // Top face
-            20, 21, 22, 22, 23, 20 // Bottom face
+            0, 3, 2, 2, 1, 0, // Front face
+            4, 7, 6, 6, 5, 4, // Back face
+            8, 11, 10, 10, 9, 8, // Left face
+            12, 15, 14, 14, 13, 12, // Right face
+            16, 19, 18, 18, 17, 16, // Top face
+            20, 23, 22, 22, 21, 20  // Bottom face
+    };
+
+    const std::vector<Vertex> planeVertices = {
+            {{-1.2f, 0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-up
+            {{1.2f,  0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-up
+            {{1.2f,  0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-right-up
+            {{-1.2f, 0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-left-up
+
+            {{-1.2f, -0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-down
+            {{1.2f,  -0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-down
+            {{1.2f,  -0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-right-down
+            {{-1.2f, -0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-left-down
+    };
+
+    const std::vector<uint16_t> planeIndices = {
+            0, 1, 2, 2, 3, 0,
+            0, 1, 5, 5, 4, 0,
+            1, 2, 6, 6, 5, 1,
+            2, 3, 7, 7, 6, 2,
+            3, 0, 4, 4, 7, 3,
+            4, 5, 6, 6, 7, 4,
     };
 
     class HelloVK {
@@ -242,53 +273,77 @@ namespace vkt {
 
         void createVertexBuffer();
 
-        // Private Variables
-        std::unique_ptr<ANativeWindow, ANativeWindowDeleter> window;
-        AAssetManager *assetManager;
-        VkInstance instance;
-        VkDebugUtilsMessengerEXT debugMessenger;
-        VkSurfaceKHR surface;
-        VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-        VkDevice device;
-        VkSwapchainKHR swapChain;
-        std::vector<VkImage> swapChainImages;
-        VkFormat swapChainImageFormat;
-        VkExtent2D swapChainExtent;
-        VkExtent2D displaySizeIdentity;
-        std::vector<VkImageView> swapChainImageViews;
-        std::vector<VkFramebuffer> swapChainFramebuffers;
-        VkCommandPool commandPool;
-        std::vector<VkCommandBuffer> commandBuffers;
-        VkQueue graphicsQueue;
-        VkQueue presentQueue;
-        VkRenderPass renderPass;
-        VkDescriptorSetLayout descriptorSetLayout;
-        VkPipelineLayout pipelineLayout;
-        VkPipeline graphicsPipeline;
-        std::vector<VkBuffer> uniformBuffers;
-        std::vector<VkDeviceMemory> uniformBuffersMemory;
-        std::vector<VkSemaphore> imageAvailableSemaphores;
-        std::vector<VkSemaphore> renderFinishedSemaphores;
-        std::vector<VkFence> inFlightFences;
-        VkDescriptorPool descriptorPool;
-        std::vector<VkDescriptorSet> descriptorSets;
-        VkImage textureImage;
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
-        uint32_t currentFrame = 0;
-        bool orientationChanged = false;
-        VkSurfaceTransformFlagBitsKHR pretransformFlag;
+        // Native window and asset manager
+        std::unique_ptr<ANativeWindow, ANativeWindowDeleter> window; // Android native window
+        AAssetManager *assetManager;                                // Android asset manager
 
-        // Vulkan-specific
-        bool enableValidationLayers = true;
-        const std::vector<const char *> validationLayers = {
+        // Vulkan instance and debug utilities
+        VkInstance instance;                                        // Vulkan instance
+        VkDebugUtilsMessengerEXT debugMessenger;                    // Debug messenger for validation layers
+
+        // Surface and physical device
+        VkSurfaceKHR surface;                                       // Surface for presenting
+        VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;           // Selected physical device (GPU)
+
+        // Logical device and queues
+        VkDevice device;                                            // Logical device
+        VkQueue graphicsQueue;                                      // Queue for graphics commands
+        VkQueue presentQueue;                                       // Queue for presenting commands
+
+        // Swapchain and related objects
+        VkSwapchainKHR swapChain;                                   // Swapchain for presenting images
+        std::vector<VkImage> swapChainImages;                       // Images in the swapchain
+        VkFormat swapChainImageFormat;                              // Format of swapchain images
+        VkExtent2D swapChainExtent;                                 // Extent (resolution) of the swapchain
+        VkExtent2D displaySizeIdentity;                             // Identity resolution for display scaling
+        std::vector<VkImageView> swapChainImageViews;               // Image views for swapchain images
+        std::vector<VkFramebuffer> swapChainFramebuffers;           // Framebuffers for rendering to the swapchain
+
+        // Command buffers and command pool
+        VkCommandPool commandPool;                                  // Command pool for allocating command buffers
+        std::vector<VkCommandBuffer> commandBuffers;                // Command buffers for recording drawing commands
+
+        // Render pass and pipeline
+        VkRenderPass renderPass;                                    // Render pass configuration
+        VkDescriptorSetLayout descriptorSetLayout;                  // Layout for descriptor sets
+        VkPipelineLayout pipelineLayout;                            // Layout for graphics pipeline
+        VkPipeline graphicsPipeline;                                // Graphics pipeline
+
+        // Synchronization primitives
+        std::vector<VkSemaphore> imageAvailableSemaphores;          // Semaphores for image availability
+        std::vector<VkSemaphore> renderFinishedSemaphores;          // Semaphores for rendering completion
+        std::vector<VkFence> inFlightFences;                        // Fences for GPU-CPU synchronization
+
+        // Uniform buffers
+        std::vector<VkBuffer> cubeUniformBuffers;                   // Uniform buffers for the cube
+        std::vector<VkDeviceMemory> cubeUniformBuffersMemory;       // Memory for cube uniform buffers
+        std::vector<VkBuffer> planeUniformBuffers;                  // Uniform buffers for the plane
+        std::vector<VkDeviceMemory> planeUniformBuffersMemory;      // Memory for plane uniform buffers
+
+        // Descriptor pool and sets
+        VkDescriptorPool descriptorPool;                            // Descriptor pool for allocation
+        std::vector<VkDescriptorSet> cubeDescriptorSets;            // Descriptor sets for cube
+        std::vector<VkDescriptorSet> planeDescriptorSets;           // Descriptor sets for plane
+
+        // Textures
+        VkImage textureImage;                                       // Texture image for rendering
+
+        // Vertex and index buffers
+        VkBuffer vertexBuffer;                                      // Buffer for vertex data
+        VkDeviceMemory vertexBufferMemory;                          // Memory for vertex buffer
+        VkBuffer indexBuffer;                                       // Buffer for index data
+        VkDeviceMemory indexBufferMemory;                           // Memory for index buffer
+
+        // Frame tracking and orientation
+        uint32_t currentFrame = 0;                                  // Current frame index
+        bool orientationChanged = false;                            // Flag for orientation changes
+        VkSurfaceTransformFlagBitsKHR pretransformFlag;             // Surface pre-transform flag
+
+        // Validation layers and extensions
+        bool enableValidationLayers = true;                        // Enable or disable validation layers
+        const std::vector<const char *> validationLayers = {        // Validation layer names
                 "VK_LAYER_KHRONOS_validation"};
-
-
-        const std::vector<const char *> deviceExtensions = {
+        const std::vector<const char *> deviceExtensions = {        // Device extension names
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME};
     };
-
 }  // namespace vkt
