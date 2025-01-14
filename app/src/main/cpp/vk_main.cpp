@@ -15,11 +15,8 @@
  *
  * We store:
  * struct android_app - a pointer to the Android application handle
- *
  * vkt::HelloVK - a pointer to our (this) Vulkan application in order to call the rendering logic
- *
  * bool canRender - a flag which signals that we are ready to call the vulkan rendering logic
- *
  */
 struct VulkanEngine {
     struct android_app *app;

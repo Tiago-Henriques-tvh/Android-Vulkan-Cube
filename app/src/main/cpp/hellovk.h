@@ -32,9 +32,7 @@ namespace vkt {
   } while (0)
 
     /*
-     * Each GPU has several families of queues that process different types of commands.
-     *
-     * Queue Types:
+     * Each GPU has several families of queues that process different types of commands. Queue Types:
      * Graphics (GRAPHICS): Processes graphics commands such as drawing and rendering.
      * Compute (COMPUTE): Processes parallel calculations, such as scientific computing.
      * Transfer (TRANSFER): Handles memory transfers.
@@ -164,10 +162,10 @@ namespace vkt {
     };
 
     const std::vector<Vertex> planeVertices = {
-            {{-1.2f, 0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-up
-            {{1.2f,  0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-up
-            {{1.2f,  0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-right-up
-            {{-1.2f, 0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-left-up
+            {{-1.2f, 0.1f,  -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-up
+            {{1.2f,  0.1f,  -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-up
+            {{1.2f,  0.1f,  1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-right-up
+            {{-1.2f, 0.1f,  1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-left-up
 
             {{-1.2f, -0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-down
             {{1.2f,  -0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-down
@@ -235,8 +233,6 @@ namespace vkt {
 
         bool checkValidationLayerSupport();
 
-        static std::vector<const char *> getRequiredExtensions(bool enableValidation);
-
         SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) const;
 
         VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
@@ -244,8 +240,6 @@ namespace vkt {
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
         void recreateSwapChain();
-
-        void onOrientationChange();
 
         VkCommandBuffer beginSingleTimeCommands();
 
@@ -272,6 +266,12 @@ namespace vkt {
         void createIndexBuffer();
 
         void createVertexBuffer();
+
+        void updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+                                     uint32_t currentImage);
+
+        void updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+                                      uint32_t currentImage);
 
         // Native window and asset manager
         std::unique_ptr<ANativeWindow, ANativeWindowDeleter> window; // Android native window
@@ -345,5 +345,7 @@ namespace vkt {
                 "VK_LAYER_KHRONOS_validation"};
         const std::vector<const char *> deviceExtensions = {        // Device extension names
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+
     };
 }  // namespace vkt

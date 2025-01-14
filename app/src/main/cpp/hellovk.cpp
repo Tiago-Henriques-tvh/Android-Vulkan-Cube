@@ -99,14 +99,24 @@ static VkResult CreateDebugUtilsMessengerEXT(
     }
 }
 
-static void
-DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
-                              const VkAllocationCallbacks *pAllocator) {
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(
-            instance, "vkDestroyDebugUtilsMessengerEXT");
+static void DestroyDebugUtilsMessengerEXT(VkInstance instance,
+                                          VkDebugUtilsMessengerEXT debugMessenger,
+                                          const VkAllocationCallbacks *pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance,
+                                                                            "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr) {
         func(instance, debugMessenger, pAllocator);
     }
+}
+
+std::vector<const char *> getRequiredExtensions(bool enableValidationLayers) {
+    std::vector<const char *> extensions;
+    extensions.push_back("VK_KHR_surface");
+    extensions.push_back("VK_KHR_android_surface");
+    if (enableValidationLayers) {
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+    return extensions;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -116,30 +126,30 @@ DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debu
 using namespace vkt;
 
 void HelloVK::initVulkan() {
-    createInstance();                // Creates the Vulkan instance.
-    createSurface();                 // Creates a surface for the swapchain, typically platform-specific (e.g., GLFW, Win32, etc.).
-    pickPhysicalDevice();            // Selects the physical device (GPU) based on supported features and preferences.
-    createLogicalDeviceAndQueue();   // Creates a logical device (GPU abstraction) and command queues.
-    setupDebugMessenger();           // Sets up debugging tools (optional, but very useful for development).
-    establishDisplaySizeIdentity();  // Initializes display size and other related parameters.
+    createInstance();                // Creates the Vulkan instance
+    createSurface();                 // Creates a surface for the swapchain, typically platform-specific (e.g., GLFW, Win32, etc.)
+    pickPhysicalDevice();            // Selects the physical device (GPU) based on supported features and preferences
+    createLogicalDeviceAndQueue();   // Creates a logical device (GPU abstraction) and command queues
+    setupDebugMessenger();           // Sets up debugging tools (optional, but very useful for development)
+    establishDisplaySizeIdentity();  // Initializes display size and other related parameters
 
-    createSwapChain();               // Creates the swap chain, which is a collection of images to display on the screen.
-    createImageViews();              // Creates image views for the swap chain images.
-    createRenderPass();              // Sspecifies how rendering is done.
-    createDescriptorSetLayout();     // Creates the descriptor set layout to describe how shaders access resources.
-    createGraphicsPipeline();        // Creates the graphics pipeline, which specifies shaders and their configuration.
-    createFramebuffers();            // Creates framebuffers for each swap chain image.
-    createCommandPool();             // Creates a command pool for managing command buffers.
+    createSwapChain();               // Creates the swap chain, which manages a collection of images that will be rendered and displayed on the screen
+    createImageViews();              // Creates image views for the swapchain images
+    createRenderPass();              // Sspecifies how rendering is done
+    createDescriptorSetLayout();     // Creates the descriptor set layout to describe how shaders access resources
+    createGraphicsPipeline();        // Creates the graphics pipeline, (specifies shaders and their configuration)
+    createFramebuffers();            // Creates framebuffers for each swap chain image
+    createCommandPool();             // Creates a command pool for managing command buffers
 
     createVertexBuffer();            // Vertex buffers creation
     createIndexBuffer();             // Index buffers creation
-    createUniformBuffers();          // Creates uniform buffers for passing data to shaders (like MVP matrix).
-    createDescriptorPool();          // Creates a descriptor pool to allocate resources like uniform buffers and textures.
-    createDescriptorSets();          // Creates descriptor sets for shaders to access resources (like uniform buffers).
-    createCommandBuffers();          // Creates the command buffer to record drawing commands.
-    createSyncObjects();             // Creates synchronization objects (like semaphores and fences) for handling GPU synchronization.
+    createUniformBuffers();          // Creates uniform buffers for passing data to shaders (MVP matrices)
+    createDescriptorPool();          // Creates a descriptor pool to allocate resources like uniform buffers and textures
+    createDescriptorSets();          // Creates descriptor sets for shaders to access resources (like uniform buffers)
+    createCommandBuffers();          // Creates the command buffer to record drawing commands
+    createSyncObjects();             // Creates synchronization objects (like semaphores and fences) for handling GPU synchronization
 
-    initialized = true;              // Marks the Vulkan initialization as complete.
+    initialized = true;              // Marks the Vulkan initialization as complete
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -342,6 +352,65 @@ void HelloVK::createLogicalDeviceAndQueue() {
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
+void HelloVK::setupDebugMessenger() {
+    if (!enableValidationLayers) {
+        return;
+    }
+
+    VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+    populateDebugMessengerCreateInfo(createInfo);
+
+    VK_CHECK(CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr,
+                                          &debugMessenger));
+}
+
+void HelloVK::establishDisplaySizeIdentity() {
+    VkSurfaceCapabilitiesKHR capabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+
+    uint32_t width = capabilities.currentExtent.width;
+    uint32_t height = capabilities.currentExtent.height;
+    if (capabilities.currentTransform & VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
+        capabilities.currentTransform & VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
+        // Swap to get identity width and height
+        capabilities.currentExtent.height = width;
+        capabilities.currentExtent.width = height;
+    }
+
+    displaySizeIdentity = capabilities.currentExtent;
+}
+
+/*
+ * This function queries the physical device for information about the surface's capabilities,
+ * available formats, and present modes, which are required to create a swap chain.
+ */
+SwapChainSupportDetails HelloVK::querySwapChainSupport(VkPhysicalDevice device) const {
+    SwapChainSupportDetails details;
+
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface,
+                                              &details.capabilities);
+
+    uint32_t formatCount;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+    if (formatCount != 0) {
+        details.formats.resize(formatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
+                                             details.formats.data());
+    }
+
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount,
+                                              nullptr);
+
+    if (presentModeCount != 0) {
+        details.presentModes.resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(
+                device, surface, &presentModeCount, details.presentModes.data());
+    }
+    return details;
+}
+
 // -------------------------------------------------------------------------------------------------
 // Create Swapchain and sync objects
 // -------------------------------------------------------------------------------------------------
@@ -443,36 +512,10 @@ void HelloVK::createSwapChain() {
     swapChainExtent = displaySizeIdentity;
 }
 
-SwapChainSupportDetails HelloVK::querySwapChainSupport(VkPhysicalDevice device) const {
-    SwapChainSupportDetails details;
-
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface,
-                                              &details.capabilities);
-
-    uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-    if (formatCount != 0) {
-        details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
-                                             details.formats.data());
-    }
-
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount,
-                                              nullptr);
-
-    if (presentModeCount != 0) {
-        details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(
-                device, surface, &presentModeCount, details.presentModes.data());
-    }
-    return details;
-}
-
 void HelloVK::reset(ANativeWindow *newWindow, AAssetManager *newManager) {
     window.reset(newWindow);
     assetManager = newManager;
+
     if (initialized) {
         createSurface();
         recreateSwapChain();
@@ -647,7 +690,7 @@ VkShaderModule HelloVK::createShaderModule(const std::vector<uint8_t> &code) {
 }
 
 /*
- *  A VkPipeline is a Vulkan object that represents a programmable graphics pipeline. It is a set of
+ * A VkPipeline is a Vulkan object that represents a programmable graphics pipeline. It is a set of
  * state objects that describe how the GPU should render a scene.
  *
  * Graphics pipeline loading a simple vertex and fragment shader, both with 'main' set as entrypoint.
@@ -656,26 +699,6 @@ VkShaderModule HelloVK::createShaderModule(const std::vector<uint8_t> &code) {
  * - the render pass (that describes all the resources used on the render -> draw call)
  * - the descriptor sets layouts
  * - and the shader modules
- *
- * Standard parameters are provided:
- *
- * 	- The input assembly is configured to draw triangle lists
- *  - We intend to draw onto the whole screen, so the scissoring extent is specified as being the
- *  whole swapchain extent.
- * 	- The rasterizer is set to discard fragmets beyond the near and far planes (depthClampEnable=false)
- * 	as well as sending geometry to the frame buffer and generate fragments for the whole area of
- * 	the geometry. We consider geometry in terms of the clockwise order of their respective vertex
- * 	input.
- *  - Multisampling is disabled
- *  - Depth and stencil testing are disabled
- * 	- ColorBlending is set to opaque mode, meaning any new fragments will overwrite the ones already
- * 	existing in the framebuffer
- *  - We utilise Vulkan's concept of dynamic state for viewport and scissoring. The other option is
- *  to hardcode the viewport/scissor options, however this means needing to recreate the whole
- *  graphics pipeline object when the screen is rotated.
- *  - The pipeline layout sends 1 uniform buffer object to the shader containing a 4x4 rotation
- *  matrix specified by the descriptorSetLayout. This is required in order to render a rotated scene
- *  when the device has been rotated.
  */
 void HelloVK::createGraphicsPipeline() {
     auto vertShaderCode = LoadBinaryFileToVector("shaders/shader.vert.spv", assetManager);
@@ -1175,22 +1198,8 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-/*
- * You may also need to update the Uniform Buffer as we are using the same transformation matrix for
- * all the cubeVertices we're rendering.
- */
-void HelloVK::updateUniformBuffer(uint32_t currentImage) {
-    // Common parameters
-    float ratio = static_cast<float>(swapChainExtent.width) /
-                  static_cast<float>(swapChainExtent.height);
-    glm::mat4 view = glm::lookAt(glm::vec3(-3.0f, 3.0f, 5.0f),
-                                 glm::vec3(0.0f, 0.0f, 0.0f),
-                                 glm::vec3(0.0f, 1.0f, 0.0f));
-    float FOV = glm::radians(60.0f);
-    glm::mat4 proj = glm::perspective(FOV, ratio, 0.1f, 20.0f);
-    proj[1][1] *= -1;// invert the Y-axis component
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.1f, 0.3f, 0.0f));
-
+void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+                                      uint32_t currentImage) {
     // Prepare cube transformation
     UniformBufferObject cubeUbo{};
     static auto startTime = std::chrono::high_resolution_clock::now();
@@ -1214,22 +1223,46 @@ void HelloVK::updateUniformBuffer(uint32_t currentImage) {
     cubeUbo.view = view;
     cubeUbo.proj = proj;
 
-    // Prepare plane transformation
-    UniformBufferObject planeUbo{};
-    planeUbo.model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
-    planeUbo.view = view;
-    planeUbo.proj = proj;
-
     // Update cube uniform buffer
     void *data;
     vkMapMemory(device, cubeUniformBuffersMemory[currentImage], 0, sizeof(cubeUbo), 0, &data);
     memcpy(data, &cubeUbo, sizeof(cubeUbo));
     vkUnmapMemory(device, cubeUniformBuffersMemory[currentImage]);
+}
+
+void HelloVK::updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
+                                       uint32_t currentImage) {
+    // Prepare plane transformation
+    UniformBufferObject planeUbo{};
+    // down the plane in relation to the cube
+    planeUbo.model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+    planeUbo.view = view;
+    planeUbo.proj = proj;
 
     // Update plane uniform buffer
+    void *data;
     vkMapMemory(device, planeUniformBuffersMemory[currentImage], 0, sizeof(planeUbo), 0, &data);
     memcpy(data, &planeUbo, sizeof(planeUbo));
     vkUnmapMemory(device, planeUniformBuffersMemory[currentImage]);
+}
+
+/*
+ * You may also need to update the Uniform Buffer as for all the vertices we're rendering
+ */
+void HelloVK::updateUniformBuffer(uint32_t currentImage) {
+    // Global parameters
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.1f, 0.3f, 0.0f));
+    glm::mat4 view = glm::lookAt(glm::vec3(-3.0f, 3.0f, 5.0f),
+                                 glm::vec3(0.0f, 0.0f, 0.0f),
+                                 glm::vec3(0.0f, 1.0f, 0.0f));
+    float FOV = glm::radians(65.0f);
+    float ratio = static_cast<float>(swapChainExtent.width) /
+                  static_cast<float>(swapChainExtent.height);
+    glm::mat4 proj = glm::perspective(FOV, ratio, 0.2f, 20.0f);
+    proj[1][1] *= -1;// invert the Y-axis component
+
+    updatePlaneUniformBuffer(model, view, proj, currentImage);
+    updateCubeUniformBuffer(model, view, proj, currentImage);
 }
 
 /*
@@ -1240,12 +1273,12 @@ void HelloVK::render() { // or draw frame
         return;
     }
     if (orientationChanged) {
-        onOrientationChange();
+        recreateSwapChain();
+        orientationChanged = false;
     }
 
     // Wait until the previous frame's rendering is complete (prevFrame)
-    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE,
-                    UINT64_MAX);
+    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     uint32_t imageIndex;
     // Acquire the next available image from the swap chain
     VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
@@ -1316,13 +1349,8 @@ void HelloVK::render() { // or draw frame
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void HelloVK::onOrientationChange() {
-    recreateSwapChain();
-    orientationChanged = false;
-}
-
 // ---------------------------------------------------------------------------------------------
-// validation layer support if you need to debug your application and others
+// Validation layer support and Cleaning
 // ---------------------------------------------------------------------------------------------
 
 bool HelloVK::checkValidationLayerSupport() {
@@ -1362,6 +1390,7 @@ void HelloVK::cleanupSwapChain() {
 
 void HelloVK::cleanup() {
     vkDeviceWaitIdle(device);
+
     cleanupSwapChain();
 
     vkDestroyBuffer(device, vertexBuffer, nullptr);
@@ -1385,53 +1414,24 @@ void HelloVK::cleanup() {
         vkDestroyFence(device, inFlightFences[i], nullptr);
     }
     vkDestroyCommandPool(device, commandPool, nullptr);
+
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
     vkDestroyRenderPass(device, renderPass, nullptr);
+
     vkDestroyDevice(device, nullptr);
+
     if (enableValidationLayers) {
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
+
     vkDestroySurfaceKHR(instance, surface, nullptr);
+
     vkDestroyInstance(instance, nullptr);
+
     initialized = false;
 }
 
-void HelloVK::setupDebugMessenger() {
-    if (!enableValidationLayers) {
-        return;
-    }
 
-    VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-    populateDebugMessengerCreateInfo(createInfo);
 
-    VK_CHECK(CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr,
-                                          &debugMessenger));
-}
-
-std::vector<const char *> HelloVK::getRequiredExtensions(bool enableValidationLayers) {
-    std::vector<const char *> extensions;
-    extensions.push_back("VK_KHR_surface");
-    extensions.push_back("VK_KHR_android_surface");
-    if (enableValidationLayers) {
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
-    return extensions;
-}
-
-void HelloVK::establishDisplaySizeIdentity() {
-    VkSurfaceCapabilitiesKHR capabilities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface,
-                                              &capabilities);
-
-    uint32_t width = capabilities.currentExtent.width;
-    uint32_t height = capabilities.currentExtent.height;
-    if (capabilities.currentTransform & VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
-        capabilities.currentTransform & VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        // Swap to get identity width and height
-        capabilities.currentExtent.height = width;
-        capabilities.currentExtent.width = height;
-    }
-
-    displaySizeIdentity = capabilities.currentExtent;
-}
