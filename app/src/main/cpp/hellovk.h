@@ -66,14 +66,17 @@ namespace vkt {
         void operator()(ANativeWindow *window) { ANativeWindow_release(window); }
     };
 
-    const int MAX_FRAMES_IN_FLIGHT = 2; // for double buffering
-    const int DESCRIPTOR_SETS_PER_FRAME = 3; // separate descriptor sets for the cube, plane, and light for each frame
+    // for double buffering
+    const int MAX_FRAMES_IN_FLIGHT = 2;
+    // separate descriptor sets for the cube, plane, texture and light for each frame
+    const int DESCRIPTOR_SETS_PER_FRAME = 4;
 
     struct DrawObject {
         uint32_t indexCount;
         uint32_t vertexOffset;
         uint32_t indexOffset;
         VkDescriptorSet descriptorSet;
+        std::optional<VkDescriptorSet> textureDescriptorSet;  // Use std::optional
         uint32_t firstIndex;
     };
 
@@ -108,8 +111,8 @@ namespace vkt {
             return bindingDescription;
         }
 
-        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-            std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+        static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+            std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
 
             attributeDescriptions[0].binding = 0;
             attributeDescriptions[0].location = 0;
@@ -121,46 +124,51 @@ namespace vkt {
             attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
             attributeDescriptions[1].offset = offsetof(Vertex, color);
 
+            attributeDescriptions[2].binding = 0;
+            attributeDescriptions[2].location = 2;
+            attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[2].offset = offsetof(Vertex, textCoord);
+
             return attributeDescriptions;
         }
     };
 
     const std::vector<Vertex> cubeVertices = {
             // Front face (light pink)
-            {{-0.5f, -0.5f, 0.5f},  {0.9f, 0.7f,  0.8f}},
-            {{0.5f,  -0.5f, 0.5f},  {0.9f, 0.7f,  0.8f}},
-            {{0.5f,  0.5f,  0.5f},  {0.9f, 0.7f,  0.8f}},
-            {{-0.5f, 0.5f,  0.5f},  {0.9f, 0.7f,  0.8f}},
+            {{-0.5f, -0.5f, 0.5f},  {0.9f, 0.7f,  0.8f},  {-1.0f, -1.0f}},
+            {{0.5f,  -0.5f, 0.5f},  {0.9f, 0.7f,  0.8f},  {-1.0f, -1.0f}},
+            {{0.5f,  0.5f,  0.5f},  {0.9f, 0.7f,  0.8f},  {-1.0f, -1.0f}},
+            {{-0.5f, 0.5f,  0.5f},  {0.9f, 0.7f,  0.8f},  {-1.0f, -1.0f}},
 
             // Back face (light green)
-            {{-0.5f, -0.5f, -0.5f}, {0.7f, 0.9f,  0.7f}},
-            {{-0.5f, 0.5f,  -0.5f}, {0.7f, 0.9f,  0.7f}},
-            {{0.5f,  0.5f,  -0.5f}, {0.7f, 0.9f,  0.7f}},
-            {{0.5f,  -0.5f, -0.5f}, {0.7f, 0.9f,  0.7f}},
+            {{-0.5f, -0.5f, -0.5f}, {0.7f, 0.9f,  0.7f},  {-1.0f, -1.0f}},
+            {{-0.5f, 0.5f,  -0.5f}, {0.7f, 0.9f,  0.7f},  {-1.0f, -1.0f}},
+            {{0.5f,  0.5f,  -0.5f}, {0.7f, 0.9f,  0.7f},  {-1.0f, -1.0f}},
+            {{0.5f,  -0.5f, -0.5f}, {0.7f, 0.9f,  0.7f},  {-1.0f, -1.0f}},
 
             // Left face (light blue)
-            {{-0.5f, -0.5f, -0.5f}, {0.7f, 0.8f,  0.9f}},
-            {{-0.5f, -0.5f, 0.5f},  {0.7f, 0.8f,  0.9f}},
-            {{-0.5f, 0.5f,  0.5f},  {0.7f, 0.8f,  0.9f}},
-            {{-0.5f, 0.5f,  -0.5f}, {0.7f, 0.8f,  0.9f}},
+            {{-0.5f, -0.5f, -0.5f}, {0.7f, 0.8f,  0.9f},  {-1.0f, -1.0f}},
+            {{-0.5f, -0.5f, 0.5f},  {0.7f, 0.8f,  0.9f},  {-1.0f, -1.0f}},
+            {{-0.5f, 0.5f,  0.5f},  {0.7f, 0.8f,  0.9f},  {-1.0f, -1.0f}},
+            {{-0.5f, 0.5f,  -0.5f}, {0.7f, 0.8f,  0.9f},  {-1.0f, -1.0f}},
 
             // Right face (light yellow)
-            {{0.5f,  -0.5f, -0.5f}, {0.9f, 0.9f,  0.6f}},
-            {{0.5f,  0.5f,  -0.5f}, {0.9f, 0.9f,  0.6f}},
-            {{0.5f,  0.5f,  0.5f},  {0.9f, 0.9f,  0.6f}},
-            {{0.5f,  -0.5f, 0.5f},  {0.9f, 0.9f,  0.6f}},
+            {{0.5f,  -0.5f, -0.5f}, {0.9f, 0.9f,  0.6f},  {-1.0f, -1.0f}},
+            {{0.5f,  0.5f,  -0.5f}, {0.9f, 0.9f,  0.6f},  {-1.0f, -1.0f}},
+            {{0.5f,  0.5f,  0.5f},  {0.9f, 0.9f,  0.6f},  {-1.0f, -1.0f}},
+            {{0.5f,  -0.5f, 0.5f},  {0.9f, 0.9f,  0.6f},  {-1.0f, -1.0f}},
 
             // Top face (light lavender)
-            {{-0.5f, 0.5f,  -0.5f}, {0.8f, 0.7f,  0.9f}},
-            {{-0.5f, 0.5f,  0.5f},  {0.8f, 0.7f,  0.9f}},
-            {{0.5f,  0.5f,  0.5f},  {0.8f, 0.7f,  0.9f}},
-            {{0.5f,  0.5f,  -0.5f}, {0.8f, 0.7f,  0.9f}},
+            {{-0.5f, 0.5f,  -0.5f}, {0.8f, 0.7f,  0.9f},  {-1.0f, -1.0f}},
+            {{-0.5f, 0.5f,  0.5f},  {0.8f, 0.7f,  0.9f},  {-1.0f, -1.0f}},
+            {{0.5f,  0.5f,  0.5f},  {0.8f, 0.7f,  0.9f},  {-1.0f, -1.0f}},
+            {{0.5f,  0.5f,  -0.5f}, {0.8f, 0.7f,  0.9f},  {-1.0f, -1.0f}},
 
             // Bottom face (light peach)
-            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.85f, 0.75f}},
-            {{0.5f,  -0.5f, -0.5f}, {1.0f, 0.85f, 0.75f}},
-            {{0.5f,  -0.5f, 0.5f},  {1.0f, 0.85f, 0.75f}},
-            {{-0.5f, -0.5f, 0.5f},  {1.0f, 0.85f, 0.75f}},
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.85f, 0.75f}, {-1.0f, -1.0f}},
+            {{0.5f,  -0.5f, -0.5f}, {1.0f, 0.85f, 0.75f}, {-1.0f, -1.0f}},
+            {{0.5f,  -0.5f, 0.5f},  {1.0f, 0.85f, 0.75f}, {-1.0f, -1.0f}},
+            {{-0.5f, -0.5f, 0.5f},  {1.0f, 0.85f, 0.75f}, {-1.0f, -1.0f}},
     };
 
     const std::vector<uint16_t> cubeIndices = {
@@ -173,15 +181,16 @@ namespace vkt {
     };
 
     const std::vector<Vertex> planeVertices = {
-            {{-1.2f, 0.1f,  -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-up
-            {{1.2f,  0.1f,  -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-up
-            {{1.2f,  0.1f,  1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-right-up
-            {{-1.2f, 0.1f,  1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-left-up
+            {{-1.2f, 0.1f,  -1.2f}, {0.2f, 0.2f, 0.2f}, {0.0f,  0.0f}}, // Bottom-left-up
+            {{1.2f,  0.1f,  -1.2f}, {0.2f, 0.2f, 0.2f}, {1.0f,  0.0f}}, // Bottom-right-up
+            {{1.2f,  0.1f,  1.2f},  {0.2f, 0.2f, 0.2f}, {1.0f,  1.0f}}, // Top-right-up
+            {{-1.2f, 0.1f,  1.2f},  {0.2f, 0.2f, 0.2f}, {0.0f,  1.0f}}, // Top-left-up
 
-            {{-1.2f, -0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-left-down
-            {{1.2f,  -0.1f, -1.2f}, {0.2f, 0.2f, 0.2f}}, // Bottom-right-down
-            {{1.2f,  -0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-right-down
-            {{-1.2f, -0.1f, 1.2f},  {0.2f, 0.2f, 0.2f}}, // Top-left-down
+            // Bottom surface and sides with grey color (no texture coordinates)
+            {{-1.2f, -0.1f, -1.2f}, {0.5f, 0.5f, 0.5f}, {-1.0f, -1.0f}}, // Bottom-left-down
+            {{1.2f,  -0.1f, -1.2f}, {0.5f, 0.5f, 0.5f}, {-1.0f, -1.0f}}, // Bottom-right-down
+            {{1.2f,  -0.1f, 1.2f},  {0.5f, 0.5f, 0.5f}, {-1.0f, -1.0f}}, // Top-right-down
+            {{-1.2f, -0.1f, 1.2f},  {0.5f, 0.5f, 0.5f}, {-1.0f, -1.0f}}, // Top-left-down
     };
 
     const std::vector<uint16_t> planeIndices = {
@@ -284,6 +293,18 @@ namespace vkt {
         void updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
                                       uint32_t currentImage);
 
+        void updateLightBuffer(uint32_t currentImage);
+
+        void decodeImage();
+
+        void copyBufferToImage();
+
+        void createTextureImageViews();
+
+        void createTextureImage();
+
+        void createTextureSampler();
+
         // Native window and asset manager
         std::unique_ptr<ANativeWindow, ANativeWindowDeleter> window; // Android native window
         AAssetManager *assetManager;                                // Android asset manager
@@ -316,8 +337,9 @@ namespace vkt {
 
         // Render pass and pipeline
         VkRenderPass renderPass;                                    // Render pass configuration
-        VkDescriptorSetLayout objectDescriptorSetLayout;                  // Layout for descriptor sets
-        VkDescriptorSetLayout lightDescriptorSetLayout;                  // Layout for descriptor sets
+        VkDescriptorSetLayout objectDescriptorSetLayout;            // Layout for descriptor sets
+        VkDescriptorSetLayout lightDescriptorSetLayout;             // Layout for descriptor sets
+        VkDescriptorSetLayout textureDescriptorSetLayout;           // Layout for descriptor sets
         VkPipelineLayout pipelineLayout;                            // Layout for graphics pipeline
         VkPipeline graphicsPipeline;                                // Graphics pipeline
 
@@ -339,12 +361,22 @@ namespace vkt {
         std::vector<VkDescriptorSet> cubeDescriptorSets;            // Descriptor sets for cube
         std::vector<VkDescriptorSet> planeDescriptorSets;           // Descriptor sets for plane
         std::vector<VkDescriptorSet> lightDescriptorSets;           // Descriptor sets for lights
+        std::vector<VkDescriptorSet> textureDescriptorSets;         // Descriptor sets for textures
 
         // Vertex and index buffers
         VkBuffer vertexBuffer;                                      // Buffer for vertex data
         VkDeviceMemory vertexBufferMemory;                          // Memory for vertex buffer
         VkBuffer indexBuffer;                                       // Buffer for index data
         VkDeviceMemory indexBufferMemory;                           // Memory for index buffer
+
+        // Textures
+        VkBuffer imgStagingBuffer;
+        VkDeviceMemory imgStagingMemory;
+        int textureWidth, textureHeight, textureChannels;
+        VkImage textureImage;
+        VkDeviceMemory textureImageMemory;
+        VkImageView textureImageView;
+        VkSampler textureSampler;
 
         // Frame tracking and orientation
         uint32_t currentFrame = 0;                                  // Current frame index
@@ -357,7 +389,6 @@ namespace vkt {
                 "VK_LAYER_KHRONOS_validation"};
         const std::vector<const char *> deviceExtensions = {        // Device extension names
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-
-        void updateLightBuffer(uint32_t currentImage);
     };
+
 }  // namespace vkt
