@@ -66,7 +66,8 @@ namespace vkt {
         void operator()(ANativeWindow *window) { ANativeWindow_release(window); }
     };
 
-    const int MAX_FRAMES_IN_FLIGHT = 2; // 2 for double buffering
+    const int MAX_FRAMES_IN_FLIGHT = 2; // for double buffering
+    const int DESCRIPTOR_SETS_PER_FRAME = 3; // separate descriptor sets for the cube, plane, and light for each frame
 
     struct DrawObject {
         uint32_t indexCount;
@@ -338,9 +339,6 @@ namespace vkt {
         std::vector<VkDescriptorSet> cubeDescriptorSets;            // Descriptor sets for cube
         std::vector<VkDescriptorSet> planeDescriptorSets;           // Descriptor sets for plane
         std::vector<VkDescriptorSet> lightDescriptorSets;           // Descriptor sets for lights
-
-        // Textures
-        VkImage textureImage;                                       // Texture image for rendering
 
         // Vertex and index buffers
         VkBuffer vertexBuffer;                                      // Buffer for vertex data

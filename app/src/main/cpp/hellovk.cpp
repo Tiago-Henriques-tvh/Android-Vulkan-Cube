@@ -833,13 +833,14 @@ void HelloVK::createGraphicsPipeline() {
 void HelloVK::createDescriptorPool() {
     VkDescriptorPoolSize poolSizes[1];
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 3;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT *
+                                                         DESCRIPTOR_SETS_PER_FRAME);
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 3;
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * DESCRIPTOR_SETS_PER_FRAME);
 
     VK_CHECK(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
 }
@@ -852,7 +853,8 @@ void HelloVK::createDescriptorPool() {
  */
 void HelloVK::createDescriptorSets() {
     // Create layouts for both cube and plane (MAX_FRAMES_IN_FLIGHT sets for each)
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT * 3, descriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT * DESCRIPTOR_SETS_PER_FRAME,
+                                               descriptorSetLayout);
 
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -865,14 +867,15 @@ void HelloVK::createDescriptorSets() {
     planeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     lightDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 
-    std::vector<VkDescriptorSet> allDescriptorSets(MAX_FRAMES_IN_FLIGHT * 3);
+    std::vector<VkDescriptorSet> allDescriptorSets(
+            MAX_FRAMES_IN_FLIGHT * DESCRIPTOR_SETS_PER_FRAME);
     VK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, allDescriptorSets.data()));
 
-    // Split descriptor sets between cube and plane
+    // Split descriptor sets between cube, plane and light
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        cubeDescriptorSets[i] = allDescriptorSets[i * 3];
-        planeDescriptorSets[i] = allDescriptorSets[i * 3 + 1];
-        lightDescriptorSets[i] = allDescriptorSets[i * 3 + 2];  // New for light
+        cubeDescriptorSets[i] = allDescriptorSets[i * DESCRIPTOR_SETS_PER_FRAME];
+        planeDescriptorSets[i] = allDescriptorSets[i * DESCRIPTOR_SETS_PER_FRAME + 1];
+        lightDescriptorSets[i] = allDescriptorSets[i * DESCRIPTOR_SETS_PER_FRAME + 2];
 
         // Descriptor buffer info for the cube
         VkDescriptorBufferInfo cubeBufferInfo{};
@@ -886,11 +889,11 @@ void HelloVK::createDescriptorSets() {
         planeBufferInfo.offset = 0;
         planeBufferInfo.range = sizeof(UniformBufferObject);
 
-        // Descriptor buffer info for the light (new)
+        // Descriptor buffer info for the light
         VkDescriptorBufferInfo lightBufferInfo{};
         lightBufferInfo.buffer = lightUniformBuffers[i];
         lightBufferInfo.offset = 0;
-        lightBufferInfo.range = sizeof(Light);  // Assuming Light is the struct for your light data
+        lightBufferInfo.range = sizeof(Light);
 
         // Write descriptor sets for the cube
         VkWriteDescriptorSet cubeDescriptorWrite{};
@@ -923,9 +926,10 @@ void HelloVK::createDescriptorSets() {
         lightDescriptorWrite.pBufferInfo = &lightBufferInfo;
 
         // Update descriptor sets
-        std::array<VkWriteDescriptorSet, 3> descriptorWrites = {cubeDescriptorWrite,
-                                                                planeDescriptorWrite,
-                                                                lightDescriptorWrite};
+        std::array<VkWriteDescriptorSet, DESCRIPTOR_SETS_PER_FRAME> descriptorWrites = {
+                cubeDescriptorWrite,
+                planeDescriptorWrite,
+                lightDescriptorWrite};
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()),
                                descriptorWrites.data(), 0, nullptr);
     }
@@ -948,7 +952,7 @@ void HelloVK::createUniformBuffers() {
     lightUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     lightUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT * 3; i++) {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         // Cube uniform buffer
         createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -972,8 +976,8 @@ void HelloVK::createUniformBuffers() {
  * be satisfied by the device in use in order to be created.
  */
 void HelloVK::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                           VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                           VkDeviceMemory &bufferMemory) {
+                           VkMemoryPropertyFlags properties,
+                           VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
@@ -999,14 +1003,13 @@ void HelloVK::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
  * Finds the index of the memory heap which matches a particular buffer's memory requirements.
  * Vulkan manages these requirements as a bitset, in this case expressed through a uint32_t.
  */
-uint32_t HelloVK::findMemoryType(uint32_t typeFilter,
-                                 VkMemoryPropertyFlags properties) {
+uint32_t HelloVK::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags &
-                                        properties) == properties) {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
             return i;
         }
     }
@@ -1444,9 +1447,7 @@ void HelloVK::cleanup() {
 
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-    vkDestroyImage(device, textureImage, nullptr);
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) { // destroy uniforms
         vkDestroyBuffer(device, cubeUniformBuffers[i], nullptr);
         vkFreeMemory(device, cubeUniformBuffersMemory[i], nullptr);
         vkDestroyBuffer(device, planeUniformBuffers[i], nullptr);
