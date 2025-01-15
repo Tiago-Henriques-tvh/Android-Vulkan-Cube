@@ -77,21 +77,20 @@ namespace vkt {
         uint32_t firstIndex;
     };
 
-    struct Light {
+    struct LightUBO {
         glm::vec3 position;   // For point light (not needed for directional)
         glm::vec3 direction;  // For directional light (only needed for directional)
-        glm::vec3 color;      // Light color (typically RGB)
-        float intensity;       // Light intensity
-        float constant;        // Point light attenuation (constant)
-        float linear;          // Point light attenuation (linear)
-        float quadratic;       // Point light attenuation (quadratic)
+        glm::vec3 color;      // LightUBO color (typically RGB)
+        float intensity;      // LightUBO intensity
+        float constant;       // Point light attenuation (constant)
+        float linear;         // Point light attenuation (linear)
+        float quadratic;      // Point light attenuation (quadratic)
     };
 
     struct UniformBufferObject {
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
-        Light light;
     };
 
     struct Vertex {
@@ -225,7 +224,7 @@ namespace vkt {
 
         void createRenderPass();
 
-        void createDescriptorSetLayout();
+        void createDescriptorSetLayouts();
 
         void createGraphicsPipeline();
 
@@ -279,10 +278,10 @@ namespace vkt {
 
         void createVertexBuffer();
 
-        void updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
+        void updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
                                      uint32_t currentImage);
 
-        void updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
+        void updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
                                       uint32_t currentImage);
 
         // Native window and asset manager
@@ -317,7 +316,8 @@ namespace vkt {
 
         // Render pass and pipeline
         VkRenderPass renderPass;                                    // Render pass configuration
-        VkDescriptorSetLayout descriptorSetLayout;                  // Layout for descriptor sets
+        VkDescriptorSetLayout objectDescriptorSetLayout;                  // Layout for descriptor sets
+        VkDescriptorSetLayout lightDescriptorSetLayout;                  // Layout for descriptor sets
         VkPipelineLayout pipelineLayout;                            // Layout for graphics pipeline
         VkPipeline graphicsPipeline;                                // Graphics pipeline
 
@@ -357,5 +357,7 @@ namespace vkt {
                 "VK_LAYER_KHRONOS_validation"};
         const std::vector<const char *> deviceExtensions = {        // Device extension names
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+        void updateLightBuffer(uint32_t currentImage);
     };
 }  // namespace vkt

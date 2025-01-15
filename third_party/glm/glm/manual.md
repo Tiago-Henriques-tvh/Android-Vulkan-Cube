@@ -2042,21 +2042,21 @@ glm::i32vec2 const PositionDataI32[VertexCount] =
 #include <glm/gtc/random.hpp> // ballRand
 
 // vecRand3, generate a random and equiprobable normalized vec3
-glm::vec3 lighting(intersection const& Intersection, material const& Material, light const& Light, glm::vec3 const& View)
+glm::vec3 lighting(intersection const& Intersection, material const& Material, light const& LightUBO, glm::vec3 const& View)
 {
     glm::vec3 Color = glm::vec3(0.0f);
     glm::vec3 LightVertor = glm::normalize(
-        Light.position() - Intersection.globalPosition() +
-        glm::ballRand(0.0f, Light.inaccuracy());
+        LightUBO.position() - Intersection.globalPosition() +
+        glm::ballRand(0.0f, LightUBO.inaccuracy());
 
-    if(!shadow(Intersection.globalPosition(), Light.position(), LightVertor))
+    if(!shadow(Intersection.globalPosition(), LightUBO.position(), LightVertor))
     {
         float Diffuse = glm::dot(Intersection.normal(), LightVector);
         if(Diffuse &lt;= 0.0f)
             return Color;
 
         if(Material.isDiffuse())
-            Color += Light.color() * Material.diffuse() * Diffuse;
+            Color += LightUBO.color() * Material.diffuse() * Diffuse;
 
         if(Material.isSpecular())
         {

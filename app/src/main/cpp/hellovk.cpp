@@ -136,7 +136,7 @@ void HelloVK::initVulkan() {
     createSwapChain();               // Creates the swap chain, which manages a collection of images that will be rendered and displayed on the screen
     createImageViews();              // Creates image views for the swapchain images
     createRenderPass();              // Sspecifies how rendering is done
-    createDescriptorSetLayout();     // Creates the descriptor set layout to describe how shaders access resources
+    createDescriptorSetLayouts();     // Creates the descriptor set layout to describe how shaders access resources
     createGraphicsPipeline();        // Creates the graphics pipeline, (specifies shaders and their configuration)
     createFramebuffers();            // Creates framebuffers for each swap chain image
     createCommandPool();             // Creates a command pool for managing command buffers
@@ -651,7 +651,8 @@ void HelloVK::createFramebuffers() {
  * The Descriptors are the handle that enable shaders to access resources (such as Buffers, Images,
  * or Samplers).
  */
-void HelloVK::createDescriptorSetLayout() {
+void HelloVK::createDescriptorSetLayouts() {
+    // Set 0: Object UBO (for model, view, proj matrices)
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -659,14 +660,30 @@ void HelloVK::createDescriptorSetLayout() {
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::array<VkDescriptorSetLayoutBinding, 1> bindings = {uboLayoutBinding};
+    VkDescriptorSetLayoutCreateInfo objectLayoutInfo{};
+    objectLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    objectLayoutInfo.bindingCount = 1;
+    objectLayoutInfo.pBindings = &uboLayoutBinding;
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
+    VK_CHECK(vkCreateDescriptorSetLayout(device, &objectLayoutInfo, nullptr,
+                                         &objectDescriptorSetLayout));
 
-    VK_CHECK(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout));
+    // Set 1: Light UBO
+    VkDescriptorSetLayoutBinding lightLayoutBinding{};
+    lightLayoutBinding.binding = 0;  // Binding = 0 for set = 1
+    lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightLayoutBinding.descriptorCount = 1;
+    lightLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    lightLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo lightLayoutInfo{};
+    lightLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    lightLayoutInfo.bindingCount = 1;
+    lightLayoutInfo.pBindings = &lightLayoutBinding;
+
+    VK_CHECK(vkCreateDescriptorSetLayout(device, &lightLayoutInfo, nullptr,
+                                         &lightDescriptorSetLayout));
+
 }
 
 /*
@@ -778,14 +795,16 @@ void HelloVK::createGraphicsPipeline() {
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
 
+    std::vector<VkDescriptorSetLayout> setLayouts = {objectDescriptorSetLayout,
+                                                     lightDescriptorSetLayout};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+    pipelineLayoutInfo.pSetLayouts = setLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
-
     VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+
     std::vector<VkDynamicState> dynamicStateEnables = {VK_DYNAMIC_STATE_VIEWPORT,
                                                        VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamicStateCI{};
@@ -852,84 +871,93 @@ void HelloVK::createDescriptorPool() {
  * buffers).
  */
 void HelloVK::createDescriptorSets() {
-    // Create layouts for both cube and plane (MAX_FRAMES_IN_FLIGHT sets for each)
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT * DESCRIPTOR_SETS_PER_FRAME,
-                                               descriptorSetLayout);
-
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
-    allocInfo.pSetLayouts = layouts.data();
-
-    // Resize to hold all descriptor sets for cube and plane
+    // Resize descriptor sets arrays
     cubeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     planeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     lightDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 
-    std::vector<VkDescriptorSet> allDescriptorSets(
-            MAX_FRAMES_IN_FLIGHT * DESCRIPTOR_SETS_PER_FRAME);
-    VK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, allDescriptorSets.data()));
+    // Allocate descriptor sets for object UBO (set = 0)
+    std::vector<VkDescriptorSetLayout> objectLayouts(MAX_FRAMES_IN_FLIGHT,
+                                                     objectDescriptorSetLayout);
+    VkDescriptorSetAllocateInfo objectAllocInfo{};
+    objectAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    objectAllocInfo.descriptorPool = descriptorPool;
+    objectAllocInfo.descriptorSetCount = static_cast<uint32_t>(objectLayouts.size());
+    objectAllocInfo.pSetLayouts = objectLayouts.data();
+    VK_CHECK(vkAllocateDescriptorSets(device, &objectAllocInfo, cubeDescriptorSets.data()));
 
-    // Split descriptor sets between cube, plane and light
+    // Allocate descriptor sets for plane UBO (set = 0, similar to cube)
+    std::vector<VkDescriptorSetLayout> planeLayouts(MAX_FRAMES_IN_FLIGHT,
+                                                    objectDescriptorSetLayout);
+    VkDescriptorSetAllocateInfo planeAllocInfo{};
+    planeAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    planeAllocInfo.descriptorPool = descriptorPool;
+    planeAllocInfo.descriptorSetCount = static_cast<uint32_t>(planeLayouts.size());
+    planeAllocInfo.pSetLayouts = planeLayouts.data();
+    VK_CHECK(vkAllocateDescriptorSets(device, &planeAllocInfo, planeDescriptorSets.data()));
+
+    // Allocate descriptor sets for light UBO (set = 1)
+    std::vector<VkDescriptorSetLayout> lightLayouts(MAX_FRAMES_IN_FLIGHT, lightDescriptorSetLayout);
+    VkDescriptorSetAllocateInfo lightAllocInfo{};
+    lightAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    lightAllocInfo.descriptorPool = descriptorPool;
+    lightAllocInfo.descriptorSetCount = static_cast<uint32_t>(lightLayouts.size());
+    lightAllocInfo.pSetLayouts = lightLayouts.data();
+    VK_CHECK(vkAllocateDescriptorSets(device, &lightAllocInfo, lightDescriptorSets.data()));
+
+    // Write descriptor sets
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        cubeDescriptorSets[i] = allDescriptorSets[i * DESCRIPTOR_SETS_PER_FRAME];
-        planeDescriptorSets[i] = allDescriptorSets[i * DESCRIPTOR_SETS_PER_FRAME + 1];
-        lightDescriptorSets[i] = allDescriptorSets[i * DESCRIPTOR_SETS_PER_FRAME + 2];
+        // Object UBO (set = 0)
+        VkDescriptorBufferInfo objectBufferInfo{};
+        objectBufferInfo.buffer = cubeUniformBuffers[i]; // Assuming cubeUniformBuffers holds object data
+        objectBufferInfo.offset = 0;
+        objectBufferInfo.range = sizeof(UniformBufferObject);
 
-        // Descriptor buffer info for the cube
-        VkDescriptorBufferInfo cubeBufferInfo{};
-        cubeBufferInfo.buffer = cubeUniformBuffers[i];
-        cubeBufferInfo.offset = 0;
-        cubeBufferInfo.range = sizeof(UniformBufferObject);
+        VkWriteDescriptorSet objectDescriptorWrite{};
+        objectDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        objectDescriptorWrite.dstSet = cubeDescriptorSets[i];
+        objectDescriptorWrite.dstBinding = 0; // Set = 0, Binding = 0
+        objectDescriptorWrite.dstArrayElement = 0;
+        objectDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        objectDescriptorWrite.descriptorCount = 1;
+        objectDescriptorWrite.pBufferInfo = &objectBufferInfo;
 
-        // Descriptor buffer info for the plane
+        // Plane UBO (set = 0)
         VkDescriptorBufferInfo planeBufferInfo{};
         planeBufferInfo.buffer = planeUniformBuffers[i];
         planeBufferInfo.offset = 0;
         planeBufferInfo.range = sizeof(UniformBufferObject);
 
-        // Descriptor buffer info for the light
-        VkDescriptorBufferInfo lightBufferInfo{};
-        lightBufferInfo.buffer = lightUniformBuffers[i];
-        lightBufferInfo.offset = 0;
-        lightBufferInfo.range = sizeof(Light);
-
-        // Write descriptor sets for the cube
-        VkWriteDescriptorSet cubeDescriptorWrite{};
-        cubeDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        cubeDescriptorWrite.dstSet = cubeDescriptorSets[i];
-        cubeDescriptorWrite.dstBinding = 0;
-        cubeDescriptorWrite.dstArrayElement = 0;
-        cubeDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        cubeDescriptorWrite.descriptorCount = 1;
-        cubeDescriptorWrite.pBufferInfo = &cubeBufferInfo;
-
-        // Write descriptor sets for the plane
         VkWriteDescriptorSet planeDescriptorWrite{};
         planeDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         planeDescriptorWrite.dstSet = planeDescriptorSets[i];
-        planeDescriptorWrite.dstBinding = 0;
+        planeDescriptorWrite.dstBinding = 0; // Set = 0, Binding = 0
         planeDescriptorWrite.dstArrayElement = 0;
         planeDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         planeDescriptorWrite.descriptorCount = 1;
         planeDescriptorWrite.pBufferInfo = &planeBufferInfo;
 
-        // Write descriptor sets for the light
+        // Light UBO (set = 1)
+        VkDescriptorBufferInfo lightBufferInfo{};
+        lightBufferInfo.buffer = lightUniformBuffers[i];
+        lightBufferInfo.offset = 0;
+        lightBufferInfo.range = sizeof(LightUBO);
+
         VkWriteDescriptorSet lightDescriptorWrite{};
         lightDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         lightDescriptorWrite.dstSet = lightDescriptorSets[i];
-        lightDescriptorWrite.dstBinding = 0;
+        lightDescriptorWrite.dstBinding = 0; // Set = 1, Binding = 0
         lightDescriptorWrite.dstArrayElement = 0;
         lightDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         lightDescriptorWrite.descriptorCount = 1;
         lightDescriptorWrite.pBufferInfo = &lightBufferInfo;
 
-        // Update descriptor sets
+        // Update descriptor sets for cube, plane, and light
         std::array<VkWriteDescriptorSet, DESCRIPTOR_SETS_PER_FRAME> descriptorWrites = {
-                cubeDescriptorWrite,
+                objectDescriptorWrite,
                 planeDescriptorWrite,
                 lightDescriptorWrite};
+
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()),
                                descriptorWrites.data(), 0, nullptr);
     }
@@ -963,8 +991,8 @@ void HelloVK::createUniformBuffers() {
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      planeUniformBuffers[i], planeUniformBuffersMemory[i]);
 
-        // Light uniform buffer
-        createBuffer(sizeof(Light), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        // LightUBO uniform buffer
+        createBuffer(sizeof(LightUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      lightUniformBuffers[i], lightUniformBuffersMemory[i]);
     }
@@ -1228,7 +1256,7 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
+void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
                                       uint32_t currentImage) {
     // Prepare cube transformation
     UniformBufferObject cubeUbo{};
@@ -1252,7 +1280,6 @@ void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4
     }
     cubeUbo.view = view;
     cubeUbo.proj = proj;
-    cubeUbo.light = light;
 
     // Update cube uniform buffer
     void *data;
@@ -1261,21 +1288,38 @@ void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4
     vkUnmapMemory(device, cubeUniformBuffersMemory[currentImage]);
 }
 
-void HelloVK::updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj, Light light,
+void HelloVK::updatePlaneUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4 proj,
                                        uint32_t currentImage) {
     // Prepare plane transformation
     UniformBufferObject planeUbo{};
     // down the plane in relation to the cube
-    planeUbo.model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+    planeUbo.model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f));
     planeUbo.view = view;
     planeUbo.proj = proj;
-    planeUbo.light = light;
 
     // Update plane uniform buffer
     void *data;
     vkMapMemory(device, planeUniformBuffersMemory[currentImage], 0, sizeof(planeUbo), 0, &data);
     memcpy(data, &planeUbo, sizeof(planeUbo));
     vkUnmapMemory(device, planeUniformBuffersMemory[currentImage]);
+}
+
+void HelloVK::updateLightBuffer(uint32_t currentImage) {
+    // Define light properties (directional light in this example)
+    LightUBO light{};
+    light.position = glm::vec3(0.0f, 5.0f, 0.0f);   // Position (only used for point/spot light)
+    light.direction = glm::vec3(0.0f, -1.0f, 0.0f); // Direction for directional light
+    light.color = glm::vec3(1.0f, 1.0f, 1.0f);      // White light
+    light.intensity = 1.0f;                                  // Full intensity
+    light.constant = 1.0f;                                   // Attenuation constants (for point light)
+    light.linear = 0.09f;
+    light.quadratic = 0.032f;
+
+    // Update light uniform buffer
+    void *data;
+    vkMapMemory(device, lightUniformBuffersMemory[currentImage], 0, sizeof(LightUBO), 0, &data);
+    memcpy(data, &light, sizeof(LightUBO));
+    vkUnmapMemory(device, lightUniformBuffersMemory[currentImage]);
 }
 
 /*
@@ -1293,24 +1337,9 @@ void HelloVK::updateUniformBuffer(uint32_t currentImage) {
     glm::mat4 proj = glm::perspective(FOV, ratio, 0.2f, 20.0f);
     proj[1][1] *= -1;// invert the Y-axis component
 
-    // Define light properties (directional light in this example)
-    Light light{};
-    light.position = glm::vec3(0.0f, 5.0f, 0.0f);   // Position (only used for point/spot light)
-    light.direction = glm::vec3(0.0f, 0.0f, 0.0f); // Direction for directional light
-    light.color = glm::vec3(1.0f, 1.0f, 1.0f);      // White light
-    light.intensity = 1.0f;                                  // Full intensity
-    light.constant = 1.0f;                                   // Attenuation constants (for point light)
-    light.linear = 0.09f;
-    light.quadratic = 0.032f;
-
-    // Update light uniform buffer
-    void *data;
-    vkMapMemory(device, lightUniformBuffersMemory[currentImage], 0, sizeof(Light), 0, &data);
-    memcpy(data, &light, sizeof(Light));
-    vkUnmapMemory(device, lightUniformBuffersMemory[currentImage]);
-
-    updatePlaneUniformBuffer(model, view, proj, light, currentImage);
-    updateCubeUniformBuffer(model, view, proj, light, currentImage);
+    updatePlaneUniformBuffer(model, view, proj, currentImage);
+    updateCubeUniformBuffer(model, view, proj, currentImage);
+    updateLightBuffer(currentImage);
 }
 
 /*
@@ -1445,7 +1474,8 @@ void HelloVK::cleanup() {
 
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device, objectDescriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device, lightDescriptorSetLayout, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) { // destroy uniforms
         vkDestroyBuffer(device, cubeUniformBuffers[i], nullptr);

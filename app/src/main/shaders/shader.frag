@@ -1,21 +1,29 @@
 #version 450
 
-layout(location = 2) in vec3 fragColor;// Color from vertex shader
-layout(location = 3) in vec3 lightPos;// Light position from vertex shader
-layout(location = 4) in vec3 lightColor;// Light color from vertex shader
+layout(location = 0) in vec3 fragColor;// Color from vertex shader
+layout(location = 1) in vec3 lightPos;// Light position from vertex shader
+layout(location = 2) in vec3 lightColor;// Light color from vertex shader
+layout(location = 3) in vec3 fragPos;// Fragment position from vertex shader
 
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out vec4 outColor;// Final color of the fragment
+
+// Simplified lighting parameters
+const vec3 ambientColor = vec3(0.8, 0.8, 0.8);// Ambient light color
 
 void main() {
-    // Calculate the direction from the fragment to the light source
-    vec3 lightDir = normalize(lightPos + gl_FragCoord.xyz);
+    // Calculate the light direction (from fragment to light)
+    vec3 lightDir = normalize(lightPos - fragPos);
 
-    // Lambertian reflectance: Diffuse reflection
-    float diff = max(dot(normalize(fragColor), lightDir), 0.0);
+    // Basic Lambertian Diffuse Reflection (without normal)
+    float diff = max(dot(lightDir, vec3(0.0, 0.0, 1.0)), 0.0);// Assuming a "flat" surface facing up
 
-    // Combine diffuse reflection with light color and fragment color
-    vec3 finalColor = lightColor * diff * fragColor;
+    // Combine ambient, diffuse, and the effect of light color
+    vec3 ambient = ambientColor * fragColor;
+    vec3 diffuse = diff * lightColor * fragColor;
 
-    // Apply the calculated color to the fragment
+    // Final color calculation
+    vec3 finalColor = ambient + diffuse;
+
+    // Set final color of the fragment
     outColor = vec4(finalColor, 1.0);
 }
