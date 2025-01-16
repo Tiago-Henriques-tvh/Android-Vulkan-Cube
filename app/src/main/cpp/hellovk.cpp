@@ -989,8 +989,8 @@ void HelloVK::createDescriptorSets() {
 
         // Texture (set = 2)
         VkDescriptorImageInfo textureImageInfo{};
-        textureImageInfo.imageView = textureImageView; // Created elsewhere
-        textureImageInfo.sampler = textureSampler;     // Created elsewhere
+        textureImageInfo.imageView = textureImageView;
+        textureImageInfo.sampler = textureSampler;
         textureImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkWriteDescriptorSet textureDescriptorWrite{};
@@ -1498,31 +1498,53 @@ void HelloVK::render() { // or draw frame
 // Validation layer support and Cleaning
 // ---------------------------------------------------------------------------------------------
 
-void HelloVK::decodeImage() {
-    std::vector<uint8_t> imageData = LoadBinaryFileToVector("img.png", assetManager);
-    if (imageData.size() == 0) {
+void vkt::HelloVK::decodeImage() {
+    std::vector<uint8_t> imageData = LoadBinaryFileToVector("img.png",
+                                                            assetManager);
+    if (imageData.empty()) {
         LOGE("Fail to load image.");
         return;
     }
 
-    unsigned char *decodedData = stbi_load_from_memory(imageData.data(), imageData.size(),
-                                                       &textureWidth, &textureHeight,
-                                                       &textureChannels, 0);
+    const int requiredChannels = 4;
+    unsigned char *decodedData = stbi_load_from_memory(imageData.data(),
+                                                       imageData.size(), &textureWidth,
+                                                       &textureHeight, &textureChannels,
+                                                       requiredChannels);
     if (decodedData == nullptr) {
         LOGE("Fail to load image to memory, %s", stbi_failure_reason());
         return;
     }
 
+    if (textureChannels != requiredChannels) {
+        textureChannels = requiredChannels;
+    }
+
     size_t imageSize = textureWidth * textureHeight * textureChannels;
 
-    // Use createBuffer to create the staging buffer and allocate memory
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 imgStagingBuffer, imgStagingMemory);
+    VkBufferCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    createInfo.size = imageSize;
+    createInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VK_CHECK(vkCreateBuffer(device, &createInfo, nullptr, &imgStagingBuffer));
 
-    // Map memory and copy the decoded image data to the buffer
-    void *data;
-    VK_CHECK(vkMapMemory(device, imgStagingMemory, 0, imageSize, 0, &data));
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, imgStagingBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    VK_CHECK(vkAllocateMemory(device, &allocInfo, nullptr, &imgStagingMemory));
+    VK_CHECK(vkBindBufferMemory(device, imgStagingBuffer, imgStagingMemory, 0));
+
+    uint8_t *data;
+    VK_CHECK(vkMapMemory(device, imgStagingMemory, 0, memRequirements.size, 0,
+                         (void **) &data));
     memcpy(data, decodedData, imageSize);
     vkUnmapMemory(device, imgStagingMemory);
 

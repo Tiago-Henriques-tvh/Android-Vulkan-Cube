@@ -34,7 +34,7 @@ void main() {
         outColor = vec4(finalColor, 1.0);
     } else {
         // Sample the texture and combine it with the final color
-        //outColor = texture(textureSampler, vTexCoords);
-        outColor = vec4(vTexCoords, 0.0, 1.0);
+        outColor = texture(textureSampler, vTexCoords);
+        // outColor = vec4(vTexCoords, 0.0, 1.0);
     }
 }
