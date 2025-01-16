@@ -6,7 +6,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
-layout(set = 1, binding = 0) uniform LightUBO {
+layout(set = 2, binding = 0) uniform LightUBO {
     vec3 position;
     vec3 direction;
     vec3 color;
