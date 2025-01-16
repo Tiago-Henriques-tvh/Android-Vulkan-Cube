@@ -6,7 +6,7 @@ layout(location = 2) in vec3 lightColor;// Light color from vertex shader
 layout(location = 3) in vec3 fragPos;// Fragment position from vertex shader
 
 layout(location = 4) in vec2 vTexCoords;
-layout(set = 2, binding = 0) uniform sampler2D textureSampler;
+layout(set = 2, binding = 1) uniform sampler2D textureSampler;
 
 layout(location = 0) out vec4 outColor;// Final color of the fragment
 

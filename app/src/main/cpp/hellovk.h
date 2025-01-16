@@ -100,7 +100,6 @@ namespace vkt {
         glm::vec3 pos;
         glm::vec3 color;
         glm::vec2 textCoord;
-        int textureId;
 
         static VkVertexInputBindingDescription getBindingDescription() {
             VkVertexInputBindingDescription bindingDescription{};

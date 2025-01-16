@@ -903,12 +903,12 @@ void HelloVK::createDescriptorSets() {
     // Allocate descriptor sets for object UBO (set = 0)
     std::vector<VkDescriptorSetLayout> objectLayouts(MAX_FRAMES_IN_FLIGHT,
                                                      objectDescriptorSetLayout);
-    VkDescriptorSetAllocateInfo objectAllocInfo{};
-    objectAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    objectAllocInfo.descriptorPool = descriptorPool;
-    objectAllocInfo.descriptorSetCount = static_cast<uint32_t>(objectLayouts.size());
-    objectAllocInfo.pSetLayouts = objectLayouts.data();
-    VK_CHECK(vkAllocateDescriptorSets(device, &objectAllocInfo, cubeDescriptorSets.data()));
+    VkDescriptorSetAllocateInfo cubeAllocInfo{};
+    cubeAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    cubeAllocInfo.descriptorPool = descriptorPool;
+    cubeAllocInfo.descriptorSetCount = static_cast<uint32_t>(objectLayouts.size());
+    cubeAllocInfo.pSetLayouts = objectLayouts.data();
+    VK_CHECK(vkAllocateDescriptorSets(device, &cubeAllocInfo, cubeDescriptorSets.data()));
 
     // Allocate descriptor sets for plane UBO (set = 0, similar to cube)
     std::vector<VkDescriptorSetLayout> planeLayouts(MAX_FRAMES_IN_FLIGHT,
@@ -943,19 +943,19 @@ void HelloVK::createDescriptorSets() {
     // Write descriptor sets
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         // Object UBO (set = 0)
-        VkDescriptorBufferInfo objectBufferInfo{};
-        objectBufferInfo.buffer = cubeUniformBuffers[i]; // Assuming cubeUniformBuffers holds object data
-        objectBufferInfo.offset = 0;
-        objectBufferInfo.range = sizeof(UniformBufferObject);
+        VkDescriptorBufferInfo cubeBufferInfo{};
+        cubeBufferInfo.buffer = cubeUniformBuffers[i]; // Assuming cubeUniformBuffers holds object data
+        cubeBufferInfo.offset = 0;
+        cubeBufferInfo.range = sizeof(UniformBufferObject);
 
-        VkWriteDescriptorSet objectDescriptorWrite{};
-        objectDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        objectDescriptorWrite.dstSet = cubeDescriptorSets[i];
-        objectDescriptorWrite.dstBinding = 0; // Set = 0, Binding = 0
-        objectDescriptorWrite.dstArrayElement = 0;
-        objectDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        objectDescriptorWrite.descriptorCount = 1;
-        objectDescriptorWrite.pBufferInfo = &objectBufferInfo;
+        VkWriteDescriptorSet vertexsDescriptorWrite{};
+        vertexsDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vertexsDescriptorWrite.dstSet = cubeDescriptorSets[i];
+        vertexsDescriptorWrite.dstBinding = 0; // Set = 0, Binding = 0
+        vertexsDescriptorWrite.dstArrayElement = 0;
+        vertexsDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        vertexsDescriptorWrite.descriptorCount = 1;
+        vertexsDescriptorWrite.pBufferInfo = &cubeBufferInfo;
 
         // Plane UBO (set = 0)
         VkDescriptorBufferInfo planeBufferInfo{};
@@ -1004,7 +1004,7 @@ void HelloVK::createDescriptorSets() {
 
         // Update descriptor sets for cube, plane, light, and texture
         std::array<VkWriteDescriptorSet, DESCRIPTOR_SETS_PER_FRAME> descriptorWrites = {
-                objectDescriptorWrite,
+                vertexsDescriptorWrite,
                 planeDescriptorWrite,
                 lightDescriptorWrite,
                 textureDescriptorWrite};
@@ -1300,13 +1300,11 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, object.indexOffset, VK_INDEX_TYPE_UINT16);
 
         // Prepare descriptor sets to bind
-        std::vector<VkDescriptorSet> descriptorSets = {
-                object.descriptorSet}; // Start with the object descriptor set
+        std::vector<VkDescriptorSet> descriptorSets = {object.descriptorSet};
 
         // If there is a texture descriptor set, add it to the list
         if (object.textureDescriptorSet) {
-            descriptorSets.push_back(
-                    *object.textureDescriptorSet); // Dereference pointer to get the actual VkDescriptorSet
+            descriptorSets.push_back(*object.textureDescriptorSet);
         }
 
         // Bind the descriptor sets (object + texture, if any)
@@ -1375,7 +1373,7 @@ void HelloVK::updateLightBuffer(uint32_t currentImage) {
     // Define light properties (directional light in this example)
     LightUBO light{};
     light.position = glm::vec3(0.0f, 5.0f, 0.0f);   // Position (only used for point/spot light)
-    light.direction = glm::vec3(0.0f, -1.0f, 0.0f); // Direction for directional light
+    light.direction = glm::vec3(0.0f, 1.0f, 0.0f);  // Direction for directional light
     light.color = glm::vec3(1.0f, 1.0f, 1.0f);      // White light
     light.intensity = 1.0f;                                  // Full intensity
     light.constant = 1.0f;                                   // Attenuation constants (for point light)
@@ -1395,7 +1393,7 @@ void HelloVK::updateLightBuffer(uint32_t currentImage) {
 void HelloVK::updateUniformBuffer(uint32_t currentImage) {
     // "Global" parameters
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.3f, 0.0f));
-    glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 1.0f, 6.0f),
+    glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 1.5f, 6.0f),
                                  glm::vec3(0.0f, 0.0f, 0.0f),
                                  glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -1499,8 +1497,7 @@ void HelloVK::render() { // or draw frame
 // ---------------------------------------------------------------------------------------------
 
 void vkt::HelloVK::decodeImage() {
-    std::vector<uint8_t> imageData = LoadBinaryFileToVector("img.png",
-                                                            assetManager);
+    std::vector<uint8_t> imageData = LoadBinaryFileToVector("img1.png", assetManager);
     if (imageData.empty()) {
         LOGE("Fail to load image.");
         return;
@@ -1543,8 +1540,7 @@ void vkt::HelloVK::decodeImage() {
     VK_CHECK(vkBindBufferMemory(device, imgStagingBuffer, imgStagingMemory, 0));
 
     uint8_t *data;
-    VK_CHECK(vkMapMemory(device, imgStagingMemory, 0, memRequirements.size, 0,
-                         (void **) &data));
+    VK_CHECK(vkMapMemory(device, imgStagingMemory, 0, memRequirements.size, 0, (void **) &data));
     memcpy(data, decodedData, imageSize);
     vkUnmapMemory(device, imgStagingMemory);
 
