@@ -584,13 +584,10 @@ void HelloVK::createRenderPass() {
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = swapChainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
@@ -786,7 +783,7 @@ void HelloVK::createGraphicsPipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
@@ -1347,6 +1344,7 @@ void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4
                 2.0f * glm::pi<float>() * frequency * (phaseTime - 2.0f) + phaseShift);
         cubeUbo.model = model * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 0.0f));
     }
+    // cubeUbo.model = glm::mat4(1.0f);
     cubeUbo.view = view;
     cubeUbo.proj = proj;
 
@@ -1395,15 +1393,16 @@ void HelloVK::updateLightBuffer(uint32_t currentImage) {
  * You may also need to update the Uniform Buffer as for all the vertices we're rendering
  */
 void HelloVK::updateUniformBuffer(uint32_t currentImage) {
-    // Global parameters
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.1f, 0.3f, 0.0f));
-    glm::mat4 view = glm::lookAt(glm::vec3(-3.0f, 3.0f, 5.0f),
+    // "Global" parameters
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.3f, 0.0f));
+    glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 1.0f, 6.0f),
                                  glm::vec3(0.0f, 0.0f, 0.0f),
                                  glm::vec3(0.0f, 1.0f, 0.0f));
+
     float FOV = glm::radians(65.0f);
     float ratio = static_cast<float>(swapChainExtent.width) /
                   static_cast<float>(swapChainExtent.height);
-    glm::mat4 proj = glm::perspective(FOV, ratio, 0.2f, 20.0f);
+    glm::mat4 proj = glm::perspective(FOV, ratio, 0.1f, 100.0f);
     proj[1][1] *= -1;// invert the Y-axis component
 
     updatePlaneUniformBuffer(model, view, proj, currentImage);

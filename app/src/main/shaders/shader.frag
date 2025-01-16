@@ -16,10 +16,7 @@ const vec3 ambientColor = vec3(0.8, 0.8, 0.8);// Ambient light color
 void main() {
     // Set final color of the fragment
     // Apply texture if valid texture coordinates are provided
-    if (vTexCoords != vec2(-1.0, -1.0)) {
-        // Sample the texture and combine it with the final color
-        outColor = texture(textureSampler, vTexCoords);
-    } else {
+    if (vTexCoords.x < 0.0 || vTexCoords.y < 0.0) {
         // Calculate the light direction (from fragment to light)
         vec3 lightDir = normalize(lightPos - fragPos);
 
@@ -35,5 +32,9 @@ void main() {
 
         // If no valid texture coordinates, use the final color only
         outColor = vec4(finalColor, 1.0);
+    } else {
+        // Sample the texture and combine it with the final color
+        //outColor = texture(textureSampler, vTexCoords);
+        outColor = vec4(vTexCoords, 0.0, 1.0);
     }
 }
