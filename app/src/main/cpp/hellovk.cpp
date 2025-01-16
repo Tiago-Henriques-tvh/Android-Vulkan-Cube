@@ -130,6 +130,7 @@ void HelloVK::initVulkan() {
     createSurface();                 // Creates a surface for the swapchain, typically platform-specific (e.g., GLFW, Win32, etc.)
     pickPhysicalDevice();            // Selects the physical device (GPU) based on supported features and preferences
     createLogicalDeviceAndQueue();   // Creates a logical device (GPU abstraction) and command queues
+    setupDebugMessenger();
     setupDebugMessenger();           // Sets up debugging tools (optional, but very useful for development)
     establishDisplaySizeIdentity();  // Initializes display size and other related parameters
 
@@ -140,13 +141,19 @@ void HelloVK::initVulkan() {
     createGraphicsPipeline();        // Creates the graphics pipeline, (specifies shaders and their configuration)
     createFramebuffers();            // Creates framebuffers for each swap chain image
     createCommandPool();             // Creates a command pool for managing command buffers
+    createCommandBuffers();          // Creates the command buffer to record drawing commands
+
+    decodeImage();
+    createTextureImage();
+    copyBufferToImage();
+    createTextureImageViews();
+    createTextureSampler();
 
     createVertexBuffer();            // Vertex buffers creation
     createIndexBuffer();             // Index buffers creation
     createUniformBuffers();          // Creates uniform buffers for passing data to shaders (MVP matrices)
     createDescriptorPool();          // Creates a descriptor pool to allocate resources like uniform buffers and textures
     createDescriptorSets();          // Creates descriptor sets for shaders to access resources (like uniform buffers)
-    createCommandBuffers();          // Creates the command buffer to record drawing commands
     createSyncObjects();             // Creates synchronization objects (like semaphores and fences) for handling GPU synchronization
 
     initialized = true;              // Marks the Vulkan initialization as complete
@@ -577,13 +584,10 @@ void HelloVK::createRenderPass() {
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = swapChainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
@@ -668,9 +672,25 @@ void HelloVK::createDescriptorSetLayouts() {
     VK_CHECK(vkCreateDescriptorSetLayout(device, &objectLayoutInfo, nullptr,
                                          &objectDescriptorSetLayout));
 
-    // Set 1: Light UBO
+    // Set 1: Texture (combined image and sampler)
+    VkDescriptorSetLayoutBinding textureLayoutBinding{};
+    textureLayoutBinding.binding = 0;  // Binding = 0 for set = 1
+    textureLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textureLayoutBinding.descriptorCount = 1;
+    textureLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    textureLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo textureLayoutInfo{};
+    textureLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    textureLayoutInfo.bindingCount = 1;
+    textureLayoutInfo.pBindings = &textureLayoutBinding;
+
+    VK_CHECK(vkCreateDescriptorSetLayout(device, &textureLayoutInfo, nullptr,
+                                         &textureDescriptorSetLayout));
+
+    // Set 2: Light UBO
     VkDescriptorSetLayoutBinding lightLayoutBinding{};
-    lightLayoutBinding.binding = 0;  // Binding = 0 for set = 1
+    lightLayoutBinding.binding = 0;  // Binding = 0 for set = 2
     lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     lightLayoutBinding.descriptorCount = 1;
     lightLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -683,7 +703,6 @@ void HelloVK::createDescriptorSetLayouts() {
 
     VK_CHECK(vkCreateDescriptorSetLayout(device, &lightLayoutInfo, nullptr,
                                          &lightDescriptorSetLayout));
-
 }
 
 /*
@@ -764,7 +783,7 @@ void HelloVK::createGraphicsPipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
@@ -796,6 +815,7 @@ void HelloVK::createGraphicsPipeline() {
     colorBlending.blendConstants[3] = 0.0f;
 
     std::vector<VkDescriptorSetLayout> setLayouts = {objectDescriptorSetLayout,
+                                                     textureDescriptorSetLayout,
                                                      lightDescriptorSetLayout};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -850,14 +870,17 @@ void HelloVK::createGraphicsPipeline() {
  * that can be accessed by all shaders in a pipeline.
  */
 void HelloVK::createDescriptorPool() {
-    VkDescriptorPoolSize poolSizes[1];
+    VkDescriptorPoolSize poolSizes[2];
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT *
-                                                         DESCRIPTOR_SETS_PER_FRAME);
+                                                         (DESCRIPTOR_SETS_PER_FRAME -
+                                                          1)); // less textures
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 1);
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
+    poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * DESCRIPTOR_SETS_PER_FRAME);
 
@@ -865,7 +888,7 @@ void HelloVK::createDescriptorPool() {
 }
 
 /*
- * The descriptor sets describe the resources bound to the binding points in a shader (uniforms)
+ * The descriptor sets describe the resources bound to the binding points in a shader (uniforms, textures)
  *
  * Create VkDescriptorSets allocated from the VkDescriptorPool specified (for the creation of the
  * buffers).
@@ -874,17 +897,18 @@ void HelloVK::createDescriptorSets() {
     // Resize descriptor sets arrays
     cubeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     planeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    textureDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     lightDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 
     // Allocate descriptor sets for object UBO (set = 0)
     std::vector<VkDescriptorSetLayout> objectLayouts(MAX_FRAMES_IN_FLIGHT,
                                                      objectDescriptorSetLayout);
-    VkDescriptorSetAllocateInfo objectAllocInfo{};
-    objectAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    objectAllocInfo.descriptorPool = descriptorPool;
-    objectAllocInfo.descriptorSetCount = static_cast<uint32_t>(objectLayouts.size());
-    objectAllocInfo.pSetLayouts = objectLayouts.data();
-    VK_CHECK(vkAllocateDescriptorSets(device, &objectAllocInfo, cubeDescriptorSets.data()));
+    VkDescriptorSetAllocateInfo cubeAllocInfo{};
+    cubeAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    cubeAllocInfo.descriptorPool = descriptorPool;
+    cubeAllocInfo.descriptorSetCount = static_cast<uint32_t>(objectLayouts.size());
+    cubeAllocInfo.pSetLayouts = objectLayouts.data();
+    VK_CHECK(vkAllocateDescriptorSets(device, &cubeAllocInfo, cubeDescriptorSets.data()));
 
     // Allocate descriptor sets for plane UBO (set = 0, similar to cube)
     std::vector<VkDescriptorSetLayout> planeLayouts(MAX_FRAMES_IN_FLIGHT,
@@ -896,8 +920,19 @@ void HelloVK::createDescriptorSets() {
     planeAllocInfo.pSetLayouts = planeLayouts.data();
     VK_CHECK(vkAllocateDescriptorSets(device, &planeAllocInfo, planeDescriptorSets.data()));
 
-    // Allocate descriptor sets for light UBO (set = 1)
-    std::vector<VkDescriptorSetLayout> lightLayouts(MAX_FRAMES_IN_FLIGHT, lightDescriptorSetLayout);
+    // Allocate descriptor sets for textures (set = 1)
+    std::vector<VkDescriptorSetLayout> textureLayouts(MAX_FRAMES_IN_FLIGHT,
+                                                      textureDescriptorSetLayout);
+    VkDescriptorSetAllocateInfo textureAllocInfo{};
+    textureAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    textureAllocInfo.descriptorPool = descriptorPool;
+    textureAllocInfo.descriptorSetCount = static_cast<uint32_t>(textureLayouts.size());
+    textureAllocInfo.pSetLayouts = textureLayouts.data();
+    VK_CHECK(vkAllocateDescriptorSets(device, &textureAllocInfo, textureDescriptorSets.data()));
+
+    // Allocate descriptor sets for light UBO (set = 2)
+    std::vector<VkDescriptorSetLayout> lightLayouts(MAX_FRAMES_IN_FLIGHT,
+                                                    lightDescriptorSetLayout);
     VkDescriptorSetAllocateInfo lightAllocInfo{};
     lightAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     lightAllocInfo.descriptorPool = descriptorPool;
@@ -908,19 +943,19 @@ void HelloVK::createDescriptorSets() {
     // Write descriptor sets
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         // Object UBO (set = 0)
-        VkDescriptorBufferInfo objectBufferInfo{};
-        objectBufferInfo.buffer = cubeUniformBuffers[i]; // Assuming cubeUniformBuffers holds object data
-        objectBufferInfo.offset = 0;
-        objectBufferInfo.range = sizeof(UniformBufferObject);
+        VkDescriptorBufferInfo cubeBufferInfo{};
+        cubeBufferInfo.buffer = cubeUniformBuffers[i]; // Assuming cubeUniformBuffers holds object data
+        cubeBufferInfo.offset = 0;
+        cubeBufferInfo.range = sizeof(UniformBufferObject);
 
-        VkWriteDescriptorSet objectDescriptorWrite{};
-        objectDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        objectDescriptorWrite.dstSet = cubeDescriptorSets[i];
-        objectDescriptorWrite.dstBinding = 0; // Set = 0, Binding = 0
-        objectDescriptorWrite.dstArrayElement = 0;
-        objectDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        objectDescriptorWrite.descriptorCount = 1;
-        objectDescriptorWrite.pBufferInfo = &objectBufferInfo;
+        VkWriteDescriptorSet vertexsDescriptorWrite{};
+        vertexsDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vertexsDescriptorWrite.dstSet = cubeDescriptorSets[i];
+        vertexsDescriptorWrite.dstBinding = 0; // Set = 0, Binding = 0
+        vertexsDescriptorWrite.dstArrayElement = 0;
+        vertexsDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        vertexsDescriptorWrite.descriptorCount = 1;
+        vertexsDescriptorWrite.pBufferInfo = &cubeBufferInfo;
 
         // Plane UBO (set = 0)
         VkDescriptorBufferInfo planeBufferInfo{};
@@ -937,7 +972,22 @@ void HelloVK::createDescriptorSets() {
         planeDescriptorWrite.descriptorCount = 1;
         planeDescriptorWrite.pBufferInfo = &planeBufferInfo;
 
-        // Light UBO (set = 1)
+        // Texture (set = 1)
+        VkDescriptorImageInfo textureImageInfo{};
+        textureImageInfo.imageView = textureImageView;
+        textureImageInfo.sampler = textureSampler;
+        textureImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkWriteDescriptorSet textureDescriptorWrite{};
+        textureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        textureDescriptorWrite.dstSet = textureDescriptorSets[i];
+        textureDescriptorWrite.dstBinding = 0; // Set = 1, Binding = 0
+        textureDescriptorWrite.dstArrayElement = 0;
+        textureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        textureDescriptorWrite.descriptorCount = 1;
+        textureDescriptorWrite.pImageInfo = &textureImageInfo;
+
+        // Light UBO (set = 2)
         VkDescriptorBufferInfo lightBufferInfo{};
         lightBufferInfo.buffer = lightUniformBuffers[i];
         lightBufferInfo.offset = 0;
@@ -946,17 +996,18 @@ void HelloVK::createDescriptorSets() {
         VkWriteDescriptorSet lightDescriptorWrite{};
         lightDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         lightDescriptorWrite.dstSet = lightDescriptorSets[i];
-        lightDescriptorWrite.dstBinding = 0; // Set = 1, Binding = 0
+        lightDescriptorWrite.dstBinding = 0; // Set = 2, Binding = 0
         lightDescriptorWrite.dstArrayElement = 0;
         lightDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         lightDescriptorWrite.descriptorCount = 1;
         lightDescriptorWrite.pBufferInfo = &lightBufferInfo;
 
-        // Update descriptor sets for cube, plane, and light
+        // Update descriptor sets for cube, plane, light, and texture
         std::array<VkWriteDescriptorSet, DESCRIPTOR_SETS_PER_FRAME> descriptorWrites = {
-                objectDescriptorWrite,
+                vertexsDescriptorWrite,
                 planeDescriptorWrite,
-                lightDescriptorWrite};
+                textureDescriptorWrite,
+                lightDescriptorWrite,};
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()),
                                descriptorWrites.data(), 0, nullptr);
@@ -1227,6 +1278,7 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
                     0,
                     0,
                     planeDescriptorSets[currentFrame],
+                    textureDescriptorSets[currentFrame], // Texture descriptor set for the plane
                     0
             },
             {
@@ -1234,6 +1286,7 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
                     static_cast<uint32_t>(sizeof(Vertex) * planeVertices.size()),
                     static_cast<uint32_t>(sizeof(uint16_t) * planeIndices.size()),
                     cubeDescriptorSets[currentFrame],
+                    std::nullopt,
                     0
             }
     };
@@ -1245,9 +1298,20 @@ void HelloVK::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageI
         // Bind vertex and index buffers for the object
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, object.indexOffset, VK_INDEX_TYPE_UINT16);
-        // Bind descriptor sets
+
+        // Prepare descriptor sets to bind
+        std::vector<VkDescriptorSet> descriptorSets = {object.descriptorSet};
+
+        // If there is a texture descriptor set, add it to the list
+        if (object.textureDescriptorSet) {
+            descriptorSets.push_back(*object.textureDescriptorSet);
+        }
+
+        // Bind the descriptor sets (object + texture, if any)
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0,
-                                1, &object.descriptorSet, 0, nullptr);
+                                static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(),
+                                0, nullptr);
+
         // Draw the object
         vkCmdDrawIndexed(commandBuffer, object.indexCount, 1, object.firstIndex, 0, 0);
     }
@@ -1278,6 +1342,7 @@ void HelloVK::updateCubeUniformBuffer(glm::mat4 model, glm::mat4 view, glm::mat4
                 2.0f * glm::pi<float>() * frequency * (phaseTime - 2.0f) + phaseShift);
         cubeUbo.model = model * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 0.0f));
     }
+    // cubeUbo.model = glm::mat4(1.0f);
     cubeUbo.view = view;
     cubeUbo.proj = proj;
 
@@ -1308,7 +1373,7 @@ void HelloVK::updateLightBuffer(uint32_t currentImage) {
     // Define light properties (directional light in this example)
     LightUBO light{};
     light.position = glm::vec3(0.0f, 5.0f, 0.0f);   // Position (only used for point/spot light)
-    light.direction = glm::vec3(0.0f, -1.0f, 0.0f); // Direction for directional light
+    light.direction = glm::vec3(0.0f, 1.0f, 0.0f);  // Direction for directional light
     light.color = glm::vec3(1.0f, 1.0f, 1.0f);      // White light
     light.intensity = 1.0f;                                  // Full intensity
     light.constant = 1.0f;                                   // Attenuation constants (for point light)
@@ -1326,15 +1391,16 @@ void HelloVK::updateLightBuffer(uint32_t currentImage) {
  * You may also need to update the Uniform Buffer as for all the vertices we're rendering
  */
 void HelloVK::updateUniformBuffer(uint32_t currentImage) {
-    // Global parameters
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.1f, 0.3f, 0.0f));
-    glm::mat4 view = glm::lookAt(glm::vec3(-3.0f, 3.0f, 5.0f),
+    // "Global" parameters
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.1f, 0.3f, 0.0f));
+    glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 6.0f),
                                  glm::vec3(0.0f, 0.0f, 0.0f),
                                  glm::vec3(0.0f, 1.0f, 0.0f));
+
     float FOV = glm::radians(65.0f);
     float ratio = static_cast<float>(swapChainExtent.width) /
                   static_cast<float>(swapChainExtent.height);
-    glm::mat4 proj = glm::perspective(FOV, ratio, 0.2f, 20.0f);
+    glm::mat4 proj = glm::perspective(FOV, ratio, 0.1f, 100.0f);
     proj[1][1] *= -1;// invert the Y-axis component
 
     updatePlaneUniformBuffer(model, view, proj, currentImage);
@@ -1430,6 +1496,201 @@ void HelloVK::render() { // or draw frame
 // Validation layer support and Cleaning
 // ---------------------------------------------------------------------------------------------
 
+void vkt::HelloVK::decodeImage() {
+    std::vector<uint8_t> imageData = LoadBinaryFileToVector("img.png", assetManager);
+    if (imageData.empty()) {
+        LOGE("Fail to load image.");
+        return;
+    }
+
+    const int requiredChannels = 4;
+    unsigned char *decodedData = stbi_load_from_memory(imageData.data(),
+                                                       imageData.size(), &textureWidth,
+                                                       &textureHeight, &textureChannels,
+                                                       requiredChannels);
+    if (decodedData == nullptr) {
+        LOGE("Fail to load image to memory, %s", stbi_failure_reason());
+        return;
+    }
+
+    if (textureChannels != requiredChannels) {
+        textureChannels = requiredChannels;
+    }
+
+    size_t imageSize = textureWidth * textureHeight * textureChannels;
+
+    VkBufferCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    createInfo.size = imageSize;
+    createInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VK_CHECK(vkCreateBuffer(device, &createInfo, nullptr, &imgStagingBuffer));
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, imgStagingBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    VK_CHECK(vkAllocateMemory(device, &allocInfo, nullptr, &imgStagingMemory));
+    VK_CHECK(vkBindBufferMemory(device, imgStagingBuffer, imgStagingMemory, 0));
+
+    uint8_t *data;
+    VK_CHECK(vkMapMemory(device, imgStagingMemory, 0, memRequirements.size, 0, (void **) &data));
+    memcpy(data, decodedData, imageSize);
+    vkUnmapMemory(device, imgStagingMemory);
+
+    stbi_image_free(decodedData);
+}
+
+void HelloVK::createTextureImage() {
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = textureWidth;
+    imageInfo.extent.height = textureHeight;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VK_CHECK(vkCreateImage(device, &imageInfo, nullptr, &textureImage));
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(device, textureImage, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VK_CHECK(vkAllocateMemory(device, &allocInfo, nullptr, &textureImageMemory));
+
+    vkBindImageMemory(device, textureImage, textureImageMemory, 0);
+}
+
+void HelloVK::copyBufferToImage() {
+    VkImageSubresourceRange subresourceRange{};
+    subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresourceRange.baseMipLevel = 0;
+    subresourceRange.levelCount = 1;
+
+    VkImageMemoryBarrier imageMemoryBarrier{};
+    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.image = textureImage;
+    imageMemoryBarrier.subresourceRange = subresourceRange;
+    imageMemoryBarrier.srcAccessMask = 0;
+    imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+    VkCommandBuffer cmd;
+    VkCommandBufferAllocateInfo cmdAllocInfo{};
+    cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdAllocInfo.commandPool = commandPool;
+    cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAllocInfo.commandBufferCount = 1;
+
+    VK_CHECK(vkAllocateCommandBuffers(device, &cmdAllocInfo, &cmd));
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                         nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+
+    VkBufferImageCopy bufferImageCopy{};
+    bufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    bufferImageCopy.imageSubresource.mipLevel = 0;
+    bufferImageCopy.imageSubresource.baseArrayLayer = 0;
+    bufferImageCopy.imageSubresource.layerCount = 1;
+    bufferImageCopy.imageExtent.width = textureWidth;
+    bufferImageCopy.imageExtent.height = textureHeight;
+    bufferImageCopy.imageExtent.depth = 1;
+    bufferImageCopy.bufferOffset = 0;
+
+    vkCmdCopyBufferToImage(cmd, imgStagingBuffer, textureImage,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1, &bufferImageCopy);
+
+    imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
+                         0, nullptr, 1, &imageMemoryBarrier);
+
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmd;
+
+    VK_CHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
+    vkQueueWaitIdle(graphicsQueue);
+}
+
+void HelloVK::createTextureImageViews() {
+    VkImageViewCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    createInfo.image = textureImage;
+    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    createInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    createInfo.subresourceRange.baseMipLevel = 0;
+    createInfo.subresourceRange.levelCount = 1;
+    createInfo.subresourceRange.baseArrayLayer = 0;
+    createInfo.subresourceRange.layerCount = 1;
+
+    VK_CHECK(vkCreateImageView(device, &createInfo, nullptr, &textureImageView));
+}
+
+void HelloVK::createTextureSampler() {
+    VkSamplerCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    createInfo.magFilter = VK_FILTER_LINEAR;
+    createInfo.minFilter = VK_FILTER_LINEAR;
+    createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.anisotropyEnable = VK_FALSE;
+    createInfo.maxAnisotropy = 16;
+    createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    createInfo.unnormalizedCoordinates = VK_FALSE;
+    createInfo.compareEnable = VK_FALSE;
+    createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    createInfo.mipLodBias = 0.0f;
+    createInfo.minLod = 0.0f;
+    createInfo.maxLod = VK_LOD_CLAMP_NONE;
+
+    VK_CHECK(vkCreateSampler(device, &createInfo, nullptr, &textureSampler));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Validation layer support and Cleaning
+// ---------------------------------------------------------------------------------------------
+
 bool HelloVK::checkValidationLayerSupport() {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -1485,6 +1746,9 @@ void HelloVK::cleanup() {
         vkDestroyBuffer(device, lightUniformBuffers[i], nullptr);
         vkFreeMemory(device, lightUniformBuffersMemory[i], nullptr);
     }
+    vkDestroyBuffer(device, imgStagingBuffer, nullptr);
+    vkFreeMemory(device, imgStagingMemory, nullptr);
+    vkFreeMemory(device, textureImageMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);

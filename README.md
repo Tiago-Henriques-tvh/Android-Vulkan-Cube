@@ -12,7 +12,8 @@ Aside from the base functionality the source code also covers convenient things 
 - Vulkan transformations and rotations on objects
 - Look at matrix with perspective
 - Several comments explaining functions
-- Added light to the scene
+- Added textures
+- Added light to the scene (in progress)
 
 ## Pre-requisites
 
